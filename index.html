@@ -439,7 +439,7 @@
     <div class="chart-card" style="padding:4px 18px 8px; overflow-x:auto;">
       <table>
         <thead>
-          <tr><th>Cycle</th><th>Retrieved (UTC)</th><th class="num">Gaps logged</th><th>12Z Aug 1 balloon</th><th>Notable finding</th></tr>
+          <tr><th>Cycle</th><th>Retrieved (UTC)</th><th class="num">Gaps logged</th><th>Notable finding</th></tr>
         </thead>
         <tbody id="cycleTable"></tbody>
       </table>
@@ -451,7 +451,6 @@
     <p class="section-sub">Carried forward, cycle to cycle, exactly as found — never papered over.</p>
     <div class="gap-list">
       <div class="gap-item"><span class="gap-dot warn"></span><div><div class="gap-title">SPBM8 Spotted Bear Lookout absent</div><div class="gap-desc">9 mi from the fire, the best-positioned sensor in the network — still not reporting in any cycle so far.</div></div></div>
-      <div class="gap-item"><span class="gap-dot warn"></span><div><div class="gap-title">12Z Aug 1 balloons not yet posted</div><div class="gap-desc">Great Falls &amp; Spokane checked every cycle since ~13:00Z threshold; both still NO DATA as of cycle11.</div></div></div>
       <div class="gap-item"><span class="gap-dot info"></span><div><div class="gap-title">Model-run substitution trap</div><div class="gap-desc">GFS 06Z/12Z Aug 1 and NAM 12Z Aug 1 silently return a stale prior-day run instead of erroring. Caught every cycle by checking embedded metadata.</div></div></div>
       <div class="gap-item"><span class="gap-dot info"></span><div><div class="gap-title">"GEM" model code is fake</div><div class="gap-desc">Silently returns byte-identical NAM data — never reported as real GEM output.</div></div></div>
       <div class="gap-item"><span class="gap-dot warn"></span><div><div class="gap-title">SWLM8 Swan Lake temperature bad</div><div class="gap-desc">Reads ~97°F every cycle, physically implausible — unusable, flagged not fixed.</div></div></div>
@@ -468,48 +467,45 @@
 <script>
 (function() {
   const cycles = [
-    { n: "4",  time: "07:45Z", sustained: 14.0, gust: 16.0, gaps: 0, balloon: "not due",  note: "Original recorder cycle; file since superseded on disk by Forecast No.4's own cycle4 (data preserved here)." },
-    { n: "5",  time: "07:55Z", sustained: 14.0, gust: 16.0, gaps: 9, balloon: "not due",  note: "Conditions at the fire remain pre-frontal and essentially unchanged from cycle4, taken roughly ten minutes earlier: light and variable wind at nearly every surface station checked, including the one ridge-level..." },
-    { n: "6",  time: "09:00Z", sustained: 16.0, gust: 20.0, gaps: 9, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle5 an hour earlier: light and variable wind at nearly every surface station, including Badger Pass, the one ridge-level instrument in range,..." },
-    { n: "7",  time: "10:00Z", sustained: 14.0, gust: 22.0, gaps: 9, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle6 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
-    { n: "8",  time: "11:00Z", sustained: 15.0, gust: 20.0, gaps: 10, balloon: "not due",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle7 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
-    { n: "9",  time: "12:00Z", sustained: 15.0, gust: 22.0, gaps: 10, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle8 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
-    { n: "10",  time: "13:00Z", sustained: 14.0, gust: 20.9, gaps: 10, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle9 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
-    { n: "11",  time: "14:00Z", sustained: 8.1, gust: 16.0, gaps: 10, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle10 an hour earlier: light and variable wind at nearly every surface station." },
-    { n: "12",  time: "15:00Z", sustained: 6.0, gust: 16.0, gaps: 11, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle11 an hour earlier: light and variable wind at nearly every surface station." },
-    { n: "13",  time: "16:00Z", sustained: 3.0, gust: 14.0, gaps: 11, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, broadly similar to cycle11–cycle12 but with two notable shifts this cycle." },
-    { n: "14",  time: "17:00Z", sustained: 4.9, gust: 14.0, gaps: 13, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal." },
-    { n: "15",  time: "18:00Z", sustained: 7.0, gust: 14.0, gaps: 12, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal." },
-    { n: "16",  time: "19:00Z", sustained: 10.0, gust: 18.0, gaps: 14, balloon: "NO DATA",  note: "The most significant development this cycle is that Great Falls has resumed off-schedule balloon launches in fire-weather support posture — the same posture this record showed on July 30 and 31 — and this new..." },
-    { n: "17",  time: "20:00Z", sustained: 8.1, gust: 16.0, gaps: 15, balloon: "NO DATA",  note: "Two things stand out this cycle." },
-    { n: "18",  time: "21:00Z", sustained: 12.0, gust: 23.0, gaps: 14, balloon: "NO DATA",  note: "Two things stand out this cycle." },
-    { n: "19",  time: "22:00Z", sustained: 14.0, gust: 24.1, gaps: 16, balloon: "NO DATA",  note: "The most notable single development this cycle is Cut Bank's wind, which nearly doubled in about one hour to become the largest single-station, single-cycle jump recorded anywhere in this program so far." },
-    { n: "20",  time: "23:00Z", sustained: 20.0, gust: 30.0, gaps: 16, balloon: "NO DATA",  note: "The single most important development this cycle is not a weather number: WFIGS reported the fire's first acreage change in the entire record, from 4,142 to 4,688 acres, alongside a drop in assigned personnel from 21..." },
-    { n: "21",  time: "00:00Z", sustained: 20.9, gust: 33.0, gaps: 16, balloon: "NO DATA",  note: "The most notable fact this cycle is negative: despite this sweep landing almost exactly at the nominal 00Z Sunday launch time for the pre-registered decision balloon pair, and despite checking every available version..." },
-    { n: "22",  time: "01:00Z", sustained: 22.0, gust: 33.0, gaps: 17, balloon: "NO DATA",  note: "The most consequential development this cycle is that Great Falls has transmitted a bulletin for the 00Z Sunday balloon — the pre-registered decision measurement — while Spokane has not." },
-    { n: "23",  time: "02:00Z", sustained: 20.0, gust: 29.0, gaps: 17, balloon: "NO DATA",  note: "The most important fact about the balloon situation this cycle is the absence of new information: the Great Falls 00Z Sunday bulletin first seen at cycle22 has not been superseded or supplemented, and Spokane has..." },
-    { n: "24",  time: "03:00Z", sustained: 20.0, gust: 29.0, gaps: 16, balloon: "NO DATA",  note: "The most important fact about the balloon situation this cycle remains the absence of new information: the Great Falls 00Z Sunday bulletin first seen at cycle22 has not been superseded or supplemented across three..." },
-    { n: "25",  time: "04:00Z", sustained: 20.0, gust: 27.0, gaps: 19, balloon: "NO DATA",  note: "The most important fact about the balloon situation this cycle remains the absence of new information: the Great Falls 00Z Sunday bulletin first seen at cycle22 has not been superseded or supplemented across four..." },
-    { n: "26",  time: "05:00Z", sustained: 14.0, gust: 28.0, gaps: 19, balloon: "NO DATA",  note: "The most important fact about the balloon situation this cycle remains the absence of new information: the Great Falls 00Z Sunday bulletin first seen at cycle22 has not been superseded or supplemented across five..." },
-    { n: "27",  time: "07:00Z", sustained: 25.0, gust: 35.0, gaps: 21, balloon: "NO DATA",  note: "Two developments dominate this cycle." },
-    { n: "28",  time: "08:00Z", sustained: 25.0, gust: 33.9, gaps: 21, balloon: "NO DATA",  note: "This cycle's most consequential development is on the model side, not the balloons: for the first time in the whole program, a NAM run newer than the confirmed-good 18Z Saturday run has posted and genuinely covers..." },
-    { n: "29",  time: "09:00Z", sustained: 23.0, gust: 36.0, gaps: 21, balloon: "NO DATA",  note: "This cycle's most consequential development is on the surface network, and it cuts two ways at once." },
-    { n: "30",  time: "10:00Z", sustained: 23.0, gust: 33.0, gaps: 21, balloon: "NO DATA",  note: "This cycle's surface network told a quieter story than cycle29's, and that quiet is itself worth recording." },
-    { n: "31",  time: "11:00Z", sustained: 19.0, gust: 28.0, gaps: 20, balloon: "NO DATA",  note: "This cycle's surface network produced two new sustained-wind records — St Mary and Roger's Pass — at stations that had not previously set one, even as several of the network's highest-profile stations (Deep Creek,..." },
-    { n: "32",  time: "12:00Z", sustained: 18.0, gust: 26.0, gaps: 21, balloon: "NO DATA",  note: "This cycle's surface network produced two new/tied wind records at Rocky Mountain Front-corridor stations — Pistol Creek's first-ever program record and Roger's Pass adding a gust record to the sustained-wind record..." },
-    { n: "33",  time: "13:00Z", sustained: 23.0, gust: 40.0, gaps: 23, balloon: "NO DATA",  note: "The surface network showed a mostly-easing picture this cycle, consistent with the morning hours after frontal passage: Roger's Pass, which had set or tied wind records the past two cycles, eased sharply; Deep Creek,..." },
-    { n: "34",  time: "14:00Z", sustained: 20.9, gust: 33.9, gaps: 23, balloon: "NO DATA",  note: "The surface network showed a mixed, mostly-quiet picture this cycle, consistent with a morning well after frontal passage: Point Six eased back from last cycle's record gust, Roger's Pass ticked up slightly after its..." },
-    { n: "35",  time: "15:00Z", sustained: 24.1, gust: 31.0, gaps: 22, balloon: "NO DATA",  note: "This was a quiet cycle on the two channels the program treats as most important — the balloons and the target-window model soundings mostly stood still — but two smaller developments are worth noting." },
+    { n: "4",  time: "07:45Z", sustained: 14.0, gust: 16.0, gaps: 0, note: "Original recorder cycle; file since superseded on disk by Forecast No.4's own cycle4 (data preserved here)." },
+    { n: "5",  time: "07:55Z", sustained: 14.0, gust: 16.0, gaps: 9, note: "Conditions at the fire remain pre-frontal and essentially unchanged from cycle4, taken roughly ten minutes earlier: light and variable wind at nearly every surface station checked, including the one ridge-level..." },
+    { n: "6",  time: "09:00Z", sustained: 16.0, gust: 20.0, gaps: 9, note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle5 an hour earlier: light and variable wind at nearly every surface station, including Badger Pass, the one ridge-level instrument in range,..." },
+    { n: "7",  time: "10:00Z", sustained: 14.0, gust: 22.0, gaps: 9, note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle6 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
+    { n: "8",  time: "11:00Z", sustained: 15.0, gust: 20.0, gaps: 10, note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle7 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
+    { n: "9",  time: "12:00Z", sustained: 15.0, gust: 22.0, gaps: 10, note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle8 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
+    { n: "10",  time: "13:00Z", sustained: 14.0, gust: 20.9, gaps: 10, note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle9 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
+    { n: "11",  time: "14:00Z", sustained: 8.1, gust: 16.0, gaps: 10, note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle10 an hour earlier: light and variable wind at nearly every surface station." },
+    { n: "12",  time: "15:00Z", sustained: 6.0, gust: 16.0, gaps: 11, note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle11 an hour earlier: light and variable wind at nearly every surface station." },
+    { n: "13",  time: "16:00Z", sustained: 3.0, gust: 14.0, gaps: 11, note: "Conditions at the fire remain pre-frontal, broadly similar to cycle11–cycle12 but with two notable shifts this cycle." },
+    { n: "14",  time: "17:00Z", sustained: 4.9, gust: 14.0, gaps: 13, note: "Conditions at the fire remain pre-frontal." },
+    { n: "15",  time: "18:00Z", sustained: 7.0, gust: 14.0, gaps: 12, note: "Conditions at the fire remain pre-frontal." },
+    { n: "16",  time: "19:00Z", sustained: 10.0, gust: 18.0, gaps: 14, note: "The most significant development this cycle is that Great Falls has resumed off-schedule balloon launches in fire-weather support posture — the same posture this record showed on July 30 and 31 — and this new..." },
+    { n: "17",  time: "20:00Z", sustained: 8.1, gust: 16.0, gaps: 15, note: "Two things stand out this cycle." },
+    { n: "18",  time: "21:00Z", sustained: 12.0, gust: 23.0, gaps: 14, note: "Two things stand out this cycle." },
+    { n: "19",  time: "22:00Z", sustained: 14.0, gust: 24.1, gaps: 16, note: "The most notable single development this cycle is Cut Bank's wind, which nearly doubled in about one hour to become the largest single-station, single-cycle jump recorded anywhere in this program so far." },
+    { n: "20",  time: "23:00Z", sustained: 20.0, gust: 30.0, gaps: 16, note: "The single most important development this cycle is not a weather number: WFIGS reported the fire's first acreage change in the entire record, from 4,142 to 4,688 acres, alongside a drop in assigned personnel from 21..." },
+    { n: "21",  time: "00:00Z", sustained: 20.9, gust: 33.0, gaps: 16, note: "The most notable fact this cycle is negative: despite this sweep landing almost exactly at the nominal 00Z Sunday launch time for the pre-registered decision balloon pair, and despite checking every available version..." },
+    { n: "22",  time: "01:00Z", sustained: 22.0, gust: 33.0, gaps: 17, note: "The most consequential development this cycle is that Great Falls has transmitted a bulletin for the 00Z Sunday balloon — the pre-registered decision measurement — while Spokane has not." },
+    { n: "23",  time: "02:00Z", sustained: 20.0, gust: 29.0, gaps: 17, note: "The most important fact about the balloon situation this cycle is the absence of new information: the Great Falls 00Z Sunday bulletin first seen at cycle22 has not been superseded or supplemented, and Spokane has..." },
+    { n: "24",  time: "03:00Z", sustained: 20.0, gust: 29.0, gaps: 16, note: "The most important fact about the balloon situation this cycle remains the absence of new information: the Great Falls 00Z Sunday bulletin first seen at cycle22 has not been superseded or supplemented across three..." },
+    { n: "25",  time: "04:00Z", sustained: 20.0, gust: 27.0, gaps: 19, note: "The most important fact about the balloon situation this cycle remains the absence of new information: the Great Falls 00Z Sunday bulletin first seen at cycle22 has not been superseded or supplemented across four..." },
+    { n: "26",  time: "05:00Z", sustained: 14.0, gust: 28.0, gaps: 19, note: "The most important fact about the balloon situation this cycle remains the absence of new information: the Great Falls 00Z Sunday bulletin first seen at cycle22 has not been superseded or supplemented across five..." },
+    { n: "27",  time: "07:00Z", sustained: 25.0, gust: 35.0, gaps: 21, note: "Two developments dominate this cycle." },
+    { n: "28",  time: "08:00Z", sustained: 25.0, gust: 33.9, gaps: 21, note: "This cycle's most consequential development is on the model side, not the balloons: for the first time in the whole program, a NAM run newer than the confirmed-good 18Z Saturday run has posted and genuinely covers..." },
+    { n: "29",  time: "09:00Z", sustained: 23.0, gust: 36.0, gaps: 21, note: "This cycle's most consequential development is on the surface network, and it cuts two ways at once." },
+    { n: "30",  time: "10:00Z", sustained: 23.0, gust: 33.0, gaps: 21, note: "This cycle's surface network told a quieter story than cycle29's, and that quiet is itself worth recording." },
+    { n: "31",  time: "11:00Z", sustained: 19.0, gust: 28.0, gaps: 20, note: "This cycle's surface network produced two new sustained-wind records — St Mary and Roger's Pass — at stations that had not previously set one, even as several of the network's highest-profile stations (Deep Creek,..." },
+    { n: "32",  time: "12:00Z", sustained: 18.0, gust: 26.0, gaps: 21, note: "This cycle's surface network produced two new/tied wind records at Rocky Mountain Front-corridor stations — Pistol Creek's first-ever program record and Roger's Pass adding a gust record to the sustained-wind record..." },
+    { n: "33",  time: "13:00Z", sustained: 23.0, gust: 40.0, gaps: 23, note: "The surface network showed a mostly-easing picture this cycle, consistent with the morning hours after frontal passage: Roger's Pass, which had set or tied wind records the past two cycles, eased sharply; Deep Creek,..." },
+    { n: "34",  time: "14:00Z", sustained: 20.9, gust: 33.9, gaps: 23, note: "The surface network showed a mixed, mostly-quiet picture this cycle, consistent with a morning well after frontal passage: Point Six eased back from last cycle's record gust, Roger's Pass ticked up slightly after its..." },
+    { n: "35",  time: "15:00Z", sustained: 24.1, gust: 31.0, gaps: 22, note: "This was a quiet cycle on the two channels the program treats as most important — the balloons and the target-window model soundings mostly stood still — but two smaller developments are worth noting." },
   ];
 
   // ---- table ----
   const tbody = document.getElementById("cycleTable");
   cycles.forEach(c => {
     const tr = document.createElement("tr");
-    const pill = c.balloon === "NO DATA"
-      ? '<span class="pill pill-wait">NO DATA</span>'
-      : '<span class="pill pill-ok">not due yet</span>';
-    tr.innerHTML = `<td>cycle${c.n}</td><td>${c.time}</td><td class="num">${c.gaps}</td><td>${pill}</td><td>${c.note}</td>`;
+    tr.innerHTML = `<td>cycle${c.n}</td><td>${c.time}</td><td class="num">${c.gaps}</td><td>${c.note}</td>`;
     tbody.appendChild(tr);
   });
 

@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Unofficial live data log for the Silvertip Fire (Bob Marshall Wilderness, MT) -- real sensor observations, wind, satellite imagery, and fire perimeter. Personal project, not an official source.">
+<title>FireView — Silvertip Fire Data Logger</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --axis:           #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6; /* sustained */
+    --series-2:       #eb6834; /* gust */
+    --series-3:       #059669;
+    --series-4:       #7c3aed;
+    --series-5:       #db2777;
+    --series-6:       #0891b2;
+    --series-7:       #ca8a04;
+    --good:           #0ca30c;
+    --warning:        #fab219;
+    --serious:        #ec835a;
+    --critical:       #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --axis:           #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-2:       #d95926;
+      --series-3:       #10b981;
+      --series-4:       #9061f9;
+      --series-5:       #ec4899;
+      --series-6:       #22b8cf;
+      --series-7:       #eab308;
+      --good:           #0ca30c;
+      --warning:        #fab219;
+      --serious:        #ec835a;
+      --critical:       #e66767;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --axis:           #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --series-3:       #10b981;
+    --series-4:       #9061f9;
+    --series-5:       #ec4899;
+    --series-6:       #22b8cf;
+    --series-7:       #eab308;
+    --good:           #0ca30c;
+    --warning:        #fab219;
+    --serious:        #ec835a;
+    --critical:       #e66767;
+  }
+
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    padding: 28px 20px 60px;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 2px; }
+  .subtitle { color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 22px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.78rem; font-weight: 600; padding: 3px 10px 3px 8px;
+    border-radius: 999px; background: color-mix(in srgb, var(--good) 14%, transparent);
+    color: var(--good); border: 1px solid color-mix(in srgb, var(--good) 35%, transparent);
+    margin-bottom: 18px;
+  }
+  .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+
+  .stat-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat-tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-tile .label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-tile .value { font-size: 1.5rem; font-weight: 650; margin-top: 4px; font-variant-numeric: proportional-nums; }
+  .stat-tile .sub { font-size: 0.76rem; color: var(--text-secondary); margin-top: 2px; }
+
+  section { margin-bottom: 30px; }
+  h2 { font-size: 1rem; margin: 0 0 4px; }
+  .section-sub { color: var(--text-secondary); font-size: 0.84rem; margin: 0 0 14px; }
+
+  .chart-card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 18px 10px;
+  }
+  .legend { display: flex; gap: 18px; font-size: 0.8rem; margin-bottom: 6px; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 14px; height: 3px; border-radius: 2px; }
+
+  svg { width: 100%; height: auto; overflow: visible; font-family: inherit; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .axis-label { fill: var(--text-muted); font-size: 10.5px; }
+  .line-sustained { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .line-gust { fill: none; stroke: var(--series-2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .pt { r: 3.5; stroke: var(--surface-1); stroke-width: 1.5; }
+  .pt-sustained { fill: var(--series-1); }
+  .pt-gust { fill: var(--series-2); }
+  .direct-label { font-size: 11px; font-weight: 600; }
+
+  .crosshair-line { stroke: var(--axis); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; pointer-events: none; }
+  .hover-target { fill: transparent; }
+  .tooltip {
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity 0.08s;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 0.78rem; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    white-space: nowrap; z-index: 5;
+  }
+  .tooltip .t-title { font-weight: 650; margin-bottom: 4px; }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 14px; }
+  .tooltip .t-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th { color: var(--text-muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  td.num { text-align: right; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+  .pill-ok { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+  .pill-wait { background: color-mix(in srgb, var(--warning) 20%, transparent); color: color-mix(in srgb, var(--warning) 65%, black); }
+
+  .gap-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
+  .gap-item { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .gap-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .gap-dot.warn { background: var(--warning); }
+  .gap-dot.info { background: var(--series-1); }
+  .gap-dot.crit { background: var(--critical); }
+  .gap-title { font-size: 0.85rem; font-weight: 600; }
+  .gap-desc { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+
+  .footnote { font-size: 0.78rem; color: var(--text-secondary); border-top: 1px solid var(--grid); padding-top: 14px; margin-top: 6px; }
+  .footnote b { color: var(--text-primary); }
+
+  /* -- station map -- */
+  .map-layout { display: grid; grid-template-columns: 1fr 200px; gap: 16px; }
+  .map-legend { display: flex; flex-direction: column; gap: 14px; font-size: 0.78rem; color: var(--text-secondary); padding-top: 4px; }
+  .map-legend h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 6px; font-weight: 650; }
+  .map-legend .row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .map-legend svg.mini { width: 16px; height: 16px; flex-shrink: 0; overflow: visible; }
+  .ring-label { fill: var(--text-muted); font-size: 9.5px; }
+  .compass-label { fill: var(--text-muted); font-size: 10px; font-weight: 650; }
+  .wedge-upwind { fill: var(--series-1); opacity: 0.08; }
+  .wedge-downwind { fill: var(--series-2); opacity: 0.10; }
+  .station-dot { stroke-width: 1.2; cursor: pointer; }
+  .fire-marker { fill: var(--critical); stroke: var(--surface-1); stroke-width: 2; }
+  .special-label { font-size: 9.5px; font-weight: 600; fill: var(--text-secondary); }
+  .wind-label { font-size: 8.5px; font-weight: 650; fill: var(--text-primary); }
+  #windTable tbody tr:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+  .wind-arrow { stroke-width: 2; stroke-linecap: round; fill: none; }
+  .sev-good { color: var(--good); font-weight: 650; }
+  .sev-warning { color: color-mix(in srgb, var(--warning) 70%, black); font-weight: 650; }
+  .sev-serious { color: var(--serious); font-weight: 650; }
+  .sev-critical { color: var(--critical); font-weight: 650; }
+  .trend-up { color: var(--critical); font-weight: 700; }
+  .trend-down { color: var(--series-1); font-weight: 700; }
+  .trend-flat { color: var(--text-muted); }
+  .geo-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
+  .fire-perimeter { fill: var(--critical); fill-opacity: 0.22; stroke: var(--critical); stroke-width: 1.4; }
+  .geo-station-dot { stroke-width: 1; cursor: pointer; }
+  .geo-label { font-size: 9px; fill: var(--text-secondary); }
+  .sat-label { font-size: 13px; font-weight: 700; fill: #fff; stroke: #000; stroke-width: 3px; paint-order: stroke fill; stroke-linejoin: round; }
+  .geo-fact-list { font-size: 0.8rem; color: var(--text-secondary); }
+  .geo-fact-list dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); margin-top: 10px; }
+  .geo-fact-list dt:first-child { margin-top: 0; }
+  .geo-fact-list dd { margin: 2px 0 0; color: var(--text-primary); font-weight: 550; }
+  .no-data-note { font-size: 0.8rem; color: var(--text-muted); font-style: italic; padding: 20px; text-align: center; }
+  .zoomable-map-wrap { position: relative; overflow: hidden; border-radius: 8px; border: 1px solid var(--border); }
+  .zoomable-map-wrap svg { display: block; cursor: grab; touch-action: none; }
+  .zoomable-map-wrap svg.grabbing { cursor: grabbing; }
+  .zoom-controls { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 4; }
+  .zoom-btn {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text-primary); font-size: 15px; font-weight: 650;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12); user-select: none;
+  }
+  .zoom-btn:hover { background: color-mix(in srgb, var(--text-primary) 8%, var(--surface-1)); }
+  .zoom-hint { position: absolute; bottom: 6px; right: 8px; font-size: 0.68rem; color: var(--text-muted); background: color-mix(in srgb, var(--surface-1) 80%, transparent); padding: 1px 6px; border-radius: 4px; z-index: 4; pointer-events: none; }
+  .basemap-switcher { position: absolute; top: 8px; left: 8px; z-index: 4; display: flex; background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+  .basemap-btn { padding: 4px 9px; font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none; border-right: 1px solid var(--border); }
+  .basemap-btn:last-child { border-right: none; }
+  .basemap-btn:hover { background: color-mix(in srgb, var(--text-primary) 6%, var(--surface-1)); }
+  .basemap-btn.active { background: var(--series-1); color: white; }
+  @media (max-width: 780px) {
+    .geo-layout { grid-template-columns: 1fr; }
+  }
+  .sat-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .sat-card { padding: 14px 14px 12px; }
+  .sat-card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .sat-card-title { font-weight: 650; font-size: 0.88rem; }
+  .sat-card-sub { font-size: 0.72rem; color: var(--text-muted); }
+  .sat-img { width: 100%; height: auto; display: block; border-radius: 6px; background: var(--page); aspect-ratio: 1 / 1; object-fit: cover; }
+  .sat-link { display: inline-block; margin-top: 8px; font-size: 0.76rem; color: var(--series-1); text-decoration: none; }
+  .sat-link:hover { text-decoration: underline; }
+  .sat-error { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+  @media (max-width: 640px) {
+    .sat-layout { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 720px) {
+    .map-layout { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 640px) {
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .gap-list { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+
+<div class="viz-root">
+
+  <div style="background:#fef3cd; border:1px solid #f5cf47; color:#5c4a00; border-radius:8px; padding:10px 14px; margin-bottom:18px; font-size:0.82rem; line-height:1.5;">
+    <b>&#9888;&#65039; Unofficial personal project, not an official source.</b>
+    This is one person's automated data-logging experiment, not affiliated with any fire agency,
+    NWS, or NIFC. Data may lag, contain gaps (marked "NO DATA"), or be wrong. For official
+    Silvertip Fire information and evacuation guidance, see
+    <a href="https://inciweb.wildfire.gov/" target="_blank" rel="noopener" style="color:#5c4a00;">InciWeb</a>,
+    <a href="https://www.nifc.gov/" target="_blank" rel="noopener" style="color:#5c4a00;">NIFC</a>,
+    or your local sheriff/county emergency management office.
+  </div>
+
+
+  <h1>FireView <span style="font-weight:450; color:var(--text-secondary);">— Silvertip Fire Data Logger</span></h1>
+  <p class="subtitle">Automated hourly observation recording · Bob Marshall Wilderness, MT · 47.82°N, 113.24°W</p>
+  <div class="badge">Running — auto-generated from cycle logs through cycle21</div>
+
+  <div class="stat-row">
+    <div class="stat-tile">
+      <div class="label">Cycles completed</div>
+      <div class="value">18</div>
+      <div class="sub">cycle4 → cycle21</div>
+    </div>
+    <div class="stat-tile">
+      <div class="label">Latest cycle</div>
+      <div class="value">00:00Z</div>
+      <div class="sub">cycle21, finished clean</div>
+    </div>
+    <div class="stat-tile">
+      <div class="label">Next run due</div>
+      <div class="value">~01:00Z</div>
+      <div class="sub">every hour through 00:00 MDT Tue Aug 4</div>
+    </div>
+    <div class="stat-tile">
+      <div class="label">Fire status (WFIGS)</div>
+      <div class="value">4,688 acres</div>
+      <div class="sub">0% contained · unchanged since 2026-07-24 21:19:15 UTC</div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Station network map</h2>
+    <p class="section-sub">All 50 stations within 75 miles currently feeding the logger, positioned by real bearing and distance from the fire (the fire itself sits around 6,050 ft). Upwind = where the fire's air is coming from; downwind = where it's headed. Hover any marker for elevation, distance, sector, and current wind.</p>
+    <div class="chart-card">
+      <div class="map-layout">
+        <div style="position:relative;">
+          <svg id="stationMap" viewBox="0 0 640 640" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="tooltip" id="mapTooltip"></div>
+        </div>
+        <div class="map-legend">
+          <div>
+            <h3>Sector</h3>
+            <div class="row"><svg class="mini"><circle cx="8" cy="8" r="5" fill="var(--series-1)"/></svg>Upwind</div>
+            <div class="row"><svg class="mini"><circle cx="8" cy="8" r="5" fill="var(--series-2)"/></svg>Downwind</div>
+            <div class="row"><svg class="mini"><circle cx="8" cy="8" r="5" fill="var(--text-muted)"/></svg>Cross-stream</div>
+          </div>
+          <div>
+            <h3>Marker</h3>
+            <div class="row"><svg class="mini"><path d="M8 2 L11 8 L8 14 L5 8 Z" fill="var(--critical)"/></svg>Fire</div>
+            <div class="row"><svg class="mini"><polygon points="8,2 14,13 2,13" fill="var(--series-1)"/></svg>Summit RAWS</div>
+            <div class="row"><svg class="mini"><rect x="3" y="3" width="10" height="10" transform="rotate(45 8 8)" fill="var(--series-2)"/></svg>Ridge SNOTEL</div>
+            <div class="row"><svg class="mini"><circle cx="8" cy="8" r="5" fill="none" stroke="var(--warning)" stroke-width="1.5" stroke-dasharray="2 2"/></svg>Expected, silent</div>
+            <div class="row"><svg class="mini"><circle cx="8" cy="8" r="5" fill="none" stroke="var(--text-muted)" stroke-width="1.5"/></svg>No wind data</div>
+            <div class="row"><svg class="mini"><circle cx="8" cy="8" r="5" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="2 2"/></svg>Stale (&gt;90 min)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Geographic map — sensors, fire &amp; real perimeter, over terrain</h2>
+    <p class="section-sub">Real hillshade terrain (ESRI World_Hillshade, USGS elevation data) under both maps — every station in true position on the left, a close-up on the actual fire perimeter polygon on the right, pulled directly from WFIGS's daily perimeter service, not an approximated circle. The perimeter updates roughly daily, independent of the hourly sensor cycle.</p>
+    <div class="chart-card">
+      <div class="geo-layout">
+        <div class="zoomable-map-wrap" id="geoMapWrap">
+          <svg id="geoMap" viewBox="0 0 640 480" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="tooltip" id="geoTooltip"></div>
+          <div class="basemap-switcher">
+            <div class="basemap-btn" data-basemap="topo">Topo</div>
+            <div class="basemap-btn" data-basemap="imagery">Satellite</div>
+            <div class="basemap-btn" data-basemap="hillshade">Terrain</div>
+          </div>
+          <div class="zoom-controls" id="geoMapZoomControls">
+            <div class="zoom-btn" data-zoom="in">+</div>
+            <div class="zoom-btn" data-zoom="out">&minus;</div>
+            <div class="zoom-btn" data-zoom="reset" style="font-size:11px;">&#8634;</div>
+          </div>
+          <div class="zoom-hint">scroll to zoom · drag to pan</div>
+        </div>
+        <div>
+          <div class="zoomable-map-wrap" id="geoPerimeterMapWrap">
+            <svg id="geoPerimeterMap" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="basemap-switcher">
+              <div class="basemap-btn" data-basemap="topo">Topo</div>
+              <div class="basemap-btn" data-basemap="imagery">Satellite</div>
+              <div class="basemap-btn" data-basemap="hillshade">Terrain</div>
+            </div>
+            <div class="zoom-controls" id="geoPerimeterMapZoomControls">
+              <div class="zoom-btn" data-zoom="in">+</div>
+              <div class="zoom-btn" data-zoom="out">&minus;</div>
+              <div class="zoom-btn" data-zoom="reset" style="font-size:11px;">&#8634;</div>
+            </div>
+            <div class="zoom-hint">scroll to zoom · drag to pan</div>
+          </div>
+          <dl class="geo-fact-list" id="geoFacts"></dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Satellite with the target fire located — GOES-West, real georeferenced tiles</h2>
+    <p class="section-sub">Real GOES-18 imagery from NASA GIBS, in the same exact-position map system as the maps above (not a cropped JPEG with a guessed location) — so the Silvertip perimeter/marker below is placed at its real coordinates, not eyeballed onto the image. Target fire only, not a general active-fire layer.</p>
+    <div class="chart-card">
+      <div class="zoomable-map-wrap" id="goesMapWrap" style="max-width:640px; margin:0 auto;">
+        <svg id="goesMap" viewBox="0 0 640 480" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="basemap-switcher">
+          <div class="basemap-btn" data-basemap="geocolor">GeoColor</div>
+          <div class="basemap-btn" data-basemap="firetemp">Fire Temp</div>
+        </div>
+        <div class="zoom-controls" id="goesMapZoomControls">
+          <div class="zoom-btn" data-zoom="in">+</div>
+          <div class="zoom-btn" data-zoom="out">&minus;</div>
+          <div class="zoom-btn" data-zoom="reset" style="font-size:11px;">&#8634;</div>
+        </div>
+        <div class="zoom-hint">scroll to zoom · drag to pan</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Live satellite — GOES-18, Missoula WFO sector</h2>
+    <p class="section-sub">Real NOAA STAR imagery, cropped to the Missoula forecast office's domain (covers Silvertip) — higher visual resolution than the georeferenced panel above, but NOAA doesn't publish this crop's exact bounding box, so nothing is overlaid on it. Refreshed automatically roughly every 10 minutes at the source; this panel re-checks every 5 minutes while the page stays open.</p>
+    <div class="sat-layout">
+      <div class="chart-card sat-card">
+        <div class="sat-card-head">
+          <span class="sat-card-title">Fire Temperature</span>
+          <span class="sat-card-sub" id="satFireTempTime">checking…</span>
+        </div>
+        <img class="sat-img" id="satFireTemp" alt="GOES-18 Fire Temperature RGB, Missoula WFO sector" />
+        <a class="sat-link" href="https://cdn.star.nesdis.noaa.gov/WFO/mso/FireTemperature/GOES18-MSO-FireTemperature-600x600.mp4" target="_blank" rel="noopener">Full loop (NOAA, opens in new tab) &rarr;</a>
+      </div>
+      <div class="chart-card sat-card">
+        <div class="sat-card-head">
+          <span class="sat-card-title">GeoColor</span>
+          <span class="sat-card-sub" id="satGeoColorTime">checking…</span>
+        </div>
+        <img class="sat-img" id="satGeoColor" alt="GOES-18 GeoColor, Missoula WFO sector" />
+        <a class="sat-link" href="https://cdn.star.nesdis.noaa.gov/WFO/mso/GEOCOLOR/GOES18-MSO-GEOCOLOR-600x600.mp4" target="_blank" rel="noopener">Full loop (NOAA, opens in new tab) &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Current wind by station</h2>
+    <p class="section-sub">Every reporting station's latest sustained wind, gust, and direction — sorted highest wind first. Wind color = fire-relevant severity band (&lt;11.5 / 11.5&ndash;23 / 23&ndash;34.5 / 34.5+ mph), not sector. Trend compares this cycle to the previous one (&#8203;&ge;2.3 mph change).</p>
+    <div class="chart-card" style="padding:4px 18px 8px; overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>Station</th><th>Sector</th><th class="num">Dist (mi)</th><th class="num">Wind (mph)</th><th class="num">Trend</th><th class="num">Gust (mph)</th><th class="num">Dir</th><th class="num">Age (min)</th></tr>
+        </thead>
+        <tbody id="windTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Point Six ridge wind (PNTM8), by cycle</h2>
+    <p class="section-sub">The one true summit RAWS in range — the wind sensor these forecasts most depend on. Miles per hour.</p>
+    <div class="chart-card">
+      <div class="legend">
+        <span class="item"><span class="swatch" style="background:var(--series-1)"></span>Sustained</span>
+        <span class="item"><span class="swatch" style="background:var(--series-2)"></span>Gust</span>
+      </div>
+      <div style="position:relative;">
+        <svg id="windChart" viewBox="0 0 900 280" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Other high-wind stations, by cycle</h2>
+    <p class="section-sub">The next highest-wind stations besides Point Six, tracked the same way. Sustained wind, miles per hour.</p>
+    <div class="chart-card">
+      <div class="legend" id="multiWindLegend"></div>
+      <div style="position:relative;">
+        <svg id="multiWindChart" viewBox="0 0 900 280" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="tooltip" id="multiWindTooltip"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cycle-by-cycle log</h2>
+    <p class="section-sub">One row per hourly recording cycle. "Gaps" = explicit NO DATA entries in that cycle's log — a higher count means more was checked and honestly flagged missing, not that the cycle failed.</p>
+    <div class="chart-card" style="padding:4px 18px 8px; overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>Cycle</th><th>Retrieved (UTC)</th><th class="num">Gaps logged</th><th>12Z Aug 1 balloon</th><th>Notable finding</th></tr>
+        </thead>
+        <tbody id="cycleTable"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Known gaps &amp; recurring flags</h2>
+    <p class="section-sub">Carried forward, cycle to cycle, exactly as found — never papered over.</p>
+    <div class="gap-list">
+      <div class="gap-item"><span class="gap-dot warn"></span><div><div class="gap-title">SPBM8 Spotted Bear Lookout absent</div><div class="gap-desc">9 mi from the fire, the best-positioned sensor in the network — still not reporting in any cycle so far.</div></div></div>
+      <div class="gap-item"><span class="gap-dot warn"></span><div><div class="gap-title">12Z Aug 1 balloons not yet posted</div><div class="gap-desc">Great Falls &amp; Spokane checked every cycle since ~13:00Z threshold; both still NO DATA as of cycle11.</div></div></div>
+      <div class="gap-item"><span class="gap-dot info"></span><div><div class="gap-title">Model-run substitution trap</div><div class="gap-desc">GFS 06Z/12Z Aug 1 and NAM 12Z Aug 1 silently return a stale prior-day run instead of erroring. Caught every cycle by checking embedded metadata.</div></div></div>
+      <div class="gap-item"><span class="gap-dot info"></span><div><div class="gap-title">"GEM" model code is fake</div><div class="gap-desc">Silently returns byte-identical NAM data — never reported as real GEM output.</div></div></div>
+      <div class="gap-item"><span class="gap-dot warn"></span><div><div class="gap-title">SWLM8 Swan Lake temperature bad</div><div class="gap-desc">Reads ~97°F every cycle, physically implausible — unusable, flagged not fixed.</div></div></div>
+      <div class="gap-item"><span class="gap-dot crit"></span><div><div class="gap-title">Badger Pass ridge sensor lag</div><div class="gap-desc">Wind/temperature channels post roughly 9–10 hrs behind real time, with an intermittent 1-hour offset between the two channels.</div></div></div>
+    </div>
+  </section>
+
+  <div class="footnote">
+    <b>Note on file numbering:</b> a separate, more active forecasting effort (Forecast No. 4, issued this cycle, plus ensemble/transect/cross-section analysis) has been running in the same folder and reused the "cycle4" filename — the original observation-only cycle4 content is preserved in this dashboard's chart/table data, but the file on disk now holds that forecast session's own cycle4. Not something this recorder is correcting on its own.
+  </div>
+
+</div>
+
+<script>
+(function() {
+  const cycles = [
+    { n: "4",  time: "07:45Z", sustained: 14.0, gust: 16.0, gaps: 0, balloon: "not due",  note: "Original recorder cycle; file since superseded on disk by Forecast No.4's own cycle4 (data preserved here)." },
+    { n: "5",  time: "07:55Z", sustained: 14.0, gust: 16.0, gaps: 9, balloon: "not due",  note: "Conditions at the fire remain pre-frontal and essentially unchanged from cycle4, taken roughly ten minutes earlier: light and variable wind at nearly every surface station checked, including the one ridge-level..." },
+    { n: "6",  time: "09:00Z", sustained: 16.0, gust: 20.0, gaps: 9, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle5 an hour earlier: light and variable wind at nearly every surface station, including Badger Pass, the one ridge-level instrument in range,..." },
+    { n: "7",  time: "10:00Z", sustained: 14.0, gust: 22.0, gaps: 9, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle6 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
+    { n: "8",  time: "11:00Z", sustained: 15.0, gust: 20.0, gaps: 10, balloon: "not due",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle7 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
+    { n: "9",  time: "12:00Z", sustained: 15.0, gust: 22.0, gaps: 10, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle8 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
+    { n: "10",  time: "13:00Z", sustained: 14.0, gust: 20.9, gaps: 10, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle9 an hour earlier: light and variable wind at nearly every surface station, with Point Six — the one true summit RAWS in range — still the..." },
+    { n: "11",  time: "14:00Z", sustained: 8.1, gust: 16.0, gaps: 10, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle10 an hour earlier: light and variable wind at nearly every surface station." },
+    { n: "12",  time: "15:00Z", sustained: 6.0, gust: 16.0, gaps: 11, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, essentially unchanged from cycle11 an hour earlier: light and variable wind at nearly every surface station." },
+    { n: "13",  time: "16:00Z", sustained: 3.0, gust: 14.0, gaps: 11, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal, broadly similar to cycle11–cycle12 but with two notable shifts this cycle." },
+    { n: "14",  time: "17:00Z", sustained: 4.9, gust: 14.0, gaps: 13, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal." },
+    { n: "15",  time: "18:00Z", sustained: 7.0, gust: 14.0, gaps: 12, balloon: "NO DATA",  note: "Conditions at the fire remain pre-frontal." },
+    { n: "16",  time: "19:00Z", sustained: 10.0, gust: 18.0, gaps: 14, balloon: "NO DATA",  note: "The most significant development this cycle is that Great Falls has resumed off-schedule balloon launches in fire-weather support posture — the same posture this record showed on July 30 and 31 — and this new..." },
+    { n: "17",  time: "20:00Z", sustained: 8.1, gust: 16.0, gaps: 15, balloon: "NO DATA",  note: "Two things stand out this cycle." },
+    { n: "18",  time: "21:00Z", sustained: 12.0, gust: 23.0, gaps: 14, balloon: "NO DATA",  note: "Two things stand out this cycle." },
+    { n: "19",  time: "22:00Z", sustained: 14.0, gust: 24.1, gaps: 16, balloon: "NO DATA",  note: "The most notable single development this cycle is Cut Bank's wind, which nearly doubled in about one hour to become the largest single-station, single-cycle jump recorded anywhere in this program so far." },
+    { n: "20",  time: "23:00Z", sustained: 20.0, gust: 30.0, gaps: 16, balloon: "NO DATA",  note: "The single most important development this cycle is not a weather number: WFIGS reported the fire's first acreage change in the entire record, from 4,142 to 4,688 acres, alongside a drop in assigned personnel from 21..." },
+    { n: "21",  time: "00:00Z", sustained: 20.9, gust: 33.0, gaps: 16, balloon: "NO DATA",  note: "The most notable fact this cycle is negative: despite this sweep landing almost exactly at the nominal 00Z Sunday launch time for the pre-registered decision balloon pair, and despite checking every available version..." },
+  ];
+
+  // ---- table ----
+  const tbody = document.getElementById("cycleTable");
+  cycles.forEach(c => {
+    const tr = document.createElement("tr");
+    const pill = c.balloon === "NO DATA"
+      ? '<span class="pill pill-wait">NO DATA</span>'
+      : '<span class="pill pill-ok">not due yet</span>';
+    tr.innerHTML = `<td>cycle${c.n}</td><td>${c.time}</td><td class="num">${c.gaps}</td><td>${pill}</td><td>${c.note}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // ---- chart ----
+  const svg = document.getElementById("windChart");
+  const tooltip = document.getElementById("tooltip");
+  const W = 900, H = 280, padL = 34, padR = 20, padT = 16, padB = 30;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const maxY = 30;
+  const n = cycles.length;
+  const xFor = i => padL + (plotW * i / (n - 1));
+  const yFor = v => padT + plotH - (plotH * v / maxY);
+
+  const ns = "http://www.w3.org/2000/svg";
+  function el(tag, attrs) {
+    const e = document.createElementNS(ns, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // gridlines + y labels
+  [0, 6, 12, 18, 24, 30].forEach(v => {
+    const y = yFor(v);
+    svg.appendChild(el("line", { x1: padL, x2: W - padR, y1: y, y2: y, class: "gridline" }));
+    const t = el("text", { x: padL - 8, y: y + 3, class: "axis-label", "text-anchor": "end" });
+    t.textContent = v;
+    svg.appendChild(t);
+  });
+
+  // x labels
+  cycles.forEach((c, i) => {
+    const t = el("text", { x: xFor(i), y: H - 8, class: "axis-label", "text-anchor": "middle" });
+    t.textContent = "c" + c.n;
+    svg.appendChild(t);
+  });
+
+  function pathFor(key) {
+    return cycles.map((c, i) => (i === 0 ? "M" : "L") + xFor(i).toFixed(1) + "," + yFor(c[key]).toFixed(1)).join(" ");
+  }
+  svg.appendChild(el("path", { d: pathFor("sustained"), class: "line-sustained" }));
+  svg.appendChild(el("path", { d: pathFor("gust"), class: "line-gust" }));
+
+  cycles.forEach((c, i) => {
+    svg.appendChild(el("circle", { cx: xFor(i), cy: yFor(c.sustained), class: "pt pt-sustained" }));
+    svg.appendChild(el("circle", { cx: xFor(i), cy: yFor(c.gust), class: "pt pt-gust" }));
+  });
+
+  // direct label on last point
+  const last = cycles[cycles.length - 1];
+  const ls = el("text", { x: xFor(n - 1) + 8, y: yFor(last.sustained) + 4, class: "direct-label", fill: "var(--series-1)" });
+  ls.textContent = last.sustained + " mph";
+  svg.appendChild(ls);
+  const lg = el("text", { x: xFor(n - 1) + 8, y: yFor(last.gust) + 4, class: "direct-label", fill: "var(--series-2)" });
+  lg.textContent = last.gust + " mph";
+  svg.appendChild(lg);
+
+  // crosshair
+  const crosshair = el("line", { x1: 0, x2: 0, y1: padT, y2: H - padB, class: "crosshair-line" });
+  svg.appendChild(crosshair);
+
+  cycles.forEach((c, i) => {
+    const hit = el("rect", {
+      x: xFor(i) - (plotW / (n - 1)) / 2, y: padT, width: plotW / (n - 1), height: plotH,
+      class: "hover-target"
+    });
+    hit.addEventListener("mouseenter", () => {
+      crosshair.setAttribute("x1", xFor(i));
+      crosshair.setAttribute("x2", xFor(i));
+      crosshair.setAttribute("opacity", "1");
+      tooltip.style.opacity = "1";
+      tooltip.innerHTML = `
+        <div class="t-title">Cycle ${c.n} · ${c.time}</div>
+        <div class="t-row"><span><span class="t-dot" style="background:var(--series-1)"></span>Sustained</span><span>${c.sustained} mph</span></div>
+        <div class="t-row"><span><span class="t-dot" style="background:var(--series-2)"></span>Gust</span><span>${c.gust} mph</span></div>
+      `;
+      const pct = xFor(i) / W * 100;
+      tooltip.style.left = pct + "%";
+      tooltip.style.top = "-10px";
+    });
+    hit.addEventListener("mouseleave", () => {
+      crosshair.setAttribute("opacity", "0");
+      tooltip.style.opacity = "0";
+    });
+    svg.appendChild(hit);
+  });
+})();
+
+// ---- station map ----
+(function() {
+  const FIRE = { lat: 47.82, lon: -113.24 };
+  const MI_PER_DEG_LAT = 69.0;
+  const MI_PER_DEG_LON = 69.17 * Math.cos(FIRE.lat * Math.PI / 180);
+
+  const stations = [
+    {"id": "GPKM8", "name": "Gate Park RAWS", "lat": 47.78972, "lon": -112.93944, "elev": 5319, "dist": 14.1, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 11.0, "gust": 23.0, "dir": 202, "age_min": 56, "trend": "down", "severity": "good"},
+    {"id": "GSNM8", "name": "Gleason RAWS", "lat": 47.8677, "lon": -112.668, "elev": 5157, "dist": 26.7, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 9.0, "gust": 29.0, "dir": 237, "age_min": 57, "trend": "flat", "severity": "good"},
+    {"id": "BEFM8", "name": "Benchmark", "lat": 47.4889, "lon": -112.88, "elev": 5344, "dist": 28.4, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 11.0, "gust": 23.0, "dir": 228, "age_min": 58, "trend": "flat", "severity": "good"},
+    {"id": "SWLM8", "name": "Swan Lake (bad temp sensor)", "lat": 47.9204, "lon": -113.8395, "elev": 3084, "dist": 28.6, "sector": "UPWIND", "reporting": false, "stale": false, "sknt": null, "gust": null, "dir": null, "age_min": 21, "trend": null, "severity": null},
+    {"id": "MTSWN", "name": "Swan Lake South (MT-83)", "lat": 47.59103, "lon": -113.75574, "elev": 3550, "dist": 28.7, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 6.0, "gust": 12.0, "dir": 292, "age_min": 51, "trend": "up", "severity": "good"},
+    {"id": "CONM8", "name": "Condon RAWS", "lat": 47.5361, "lon": -113.7172, "elev": 3707, "dist": 29.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 4.9, "gust": 15.0, "dir": 283, "age_min": 58, "trend": "flat", "severity": "good"},
+    {"id": "FIEM8", "name": "Fielding RAWS (stale since Jul 23)", "lat": 48.28, "lon": -113.4333, "elev": 4862, "dist": 33.0, "sector": "cross-stream", "reporting": true, "stale": true, "sknt": 0.0, "gust": 3.0, "dir": 203, "age_min": 13464, "trend": "flat", "severity": "good"},
+    {"id": "MTESX", "name": "Essex (US-2)", "lat": 48.28176, "lon": -113.60657, "elev": 3848, "dist": 36.1, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 4.0, "gust": 19.0, "dir": 135, "age_min": 51, "trend": "flat", "severity": "good"},
+    {"id": "MTYLW", "name": "Yellow Bay (MT-35)", "lat": 47.88485, "lon": -114.02916, "elev": 3051, "dist": 36.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 2.0, "gust": 11.0, "dir": 270, "age_min": 51, "trend": "down", "severity": "good"},
+    {"id": "DCRM8", "name": "Deep Creek RAWS", "lat": 48.3555, "lon": -113.1138, "elev": 5240, "dist": 37.5, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 23.0, "gust": 38.0, "dir": 236, "age_min": 45, "trend": "down", "severity": "serious"},
+    {"id": "RONM8", "name": "Ronan RAWS", "lat": 47.8833, "lon": -114.1667, "elev": 2890, "dist": 43.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 6.0, "gust": 18.0, "dir": 270, "age_min": 35, "trend": "flat", "severity": "good"},
+    {"id": "7S0", "name": "Ronan Airport", "lat": 47.5683, "lon": -114.1001, "elev": 3079, "dist": 43.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 17.3, "gust": 27.6, "dir": 260, "age_min": 11, "trend": "up", "severity": "warning"},
+    {"id": "MTBRN", "name": "Two Medicine Bridge (US-2)", "lat": 48.45265, "lon": -113.19507, "elev": 4915, "dist": 43.8, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 26.0, "gust": 38.0, "dir": 270, "age_min": 51, "trend": "up", "severity": "serious"},
+    {"id": "SEEM8", "name": "Seeley Lake RAWS", "lat": 47.1827, "lon": -113.4472, "elev": 4249, "dist": 45.1, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 9.0, "gust": 19.0, "dir": 298, "age_min": 54, "trend": "flat", "severity": "good"},
+    {"id": "MTPND", "name": "Pendroy (US-89)", "lat": 48.07322, "lon": -112.33418, "elev": 4324, "dist": 45.4, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 27.0, "gust": 39.0, "dir": 248, "age_min": 51, "trend": "up", "severity": "serious"},
+    {"id": "JETM8", "name": "Jette RAWS", "lat": 47.7669, "lon": -114.2347, "elev": 3635, "dist": 46.3, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 4.0, "gust": 10.0, "dir": 253, "age_min": 23, "trend": "flat", "severity": "good"},
+    {"id": "KERM8", "name": "Flathead Lake 5 WSW (Kerr Dam)", "lat": 47.6775, "lon": -114.2419, "elev": 2733, "dist": 47.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 9.0, "gust": null, "dir": 207, "age_min": 36, "trend": "flat", "severity": "good"},
+    {"id": "MTCTS", "name": "Choteau South (US-287)", "lat": 47.69807, "lon": -112.22771, "elev": 4573, "dist": 47.8, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 28.0, "gust": 38.0, "dir": 270, "age_min": 51, "trend": "flat", "severity": "serious"},
+    {"id": "MTBWG", "name": "Browning (US-89)", "lat": 48.53523, "lon": -112.9813, "elev": 4403, "dist": 50.8, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 36.0, "gust": 42.0, "dir": 22, "age_min": 51, "trend": "up", "severity": "critical"},
+    {"id": "MTELM", "name": "Elmo (US-93)", "lat": 47.82806, "lon": -114.34778, "elev": 2910, "dist": 51.4, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 14.0, "gust": 29.0, "dir": 248, "age_min": 51, "trend": "flat", "severity": "warning"},
+    {"id": "BGRM8", "name": "Browning BFA RAWS", "lat": 48.5616, "lon": -113.0134, "elev": 4370, "dist": 52.3, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 13.0, "gust": 28.0, "dir": 230, "age_min": 45, "trend": "flat", "severity": "warning"},
+    {"id": "MTFLT", "name": "Flathead River (MT-35)", "lat": 48.21908, "lon": -114.23793, "elev": 3009, "dist": 53.7, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 13.0, "gust": 23.0, "dir": 270, "age_min": 51, "trend": "up", "severity": "warning"},
+    {"id": "HNYM8", "name": "Hungry Horse RAWS", "lat": 48.3847, "lon": -114.0575, "elev": 3123, "dist": 54.3, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 10.0, "gust": 36.0, "dir": 295, "age_min": 55, "trend": "up", "severity": "good"},
+    {"id": "MTHGH", "name": "Hungry Horse (RWIS)", "lat": 48.38485, "lon": -114.07805, "elev": 3041, "dist": 54.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 6.0, "gust": 23.0, "dir": 315, "age_min": 51, "trend": "up", "severity": "good"},
+    {"id": "PSTM8", "name": "Pistol Creek RAWS", "lat": 47.2167, "lon": -114.0167, "elev": 5509, "dist": 55.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 11.0, "gust": 19.0, "dir": 254, "age_min": 25, "trend": "up", "severity": "good"},
+    {"id": "CLWM8", "name": "Clearwater", "lat": 47.01361, "lon": -113.33306, "elev": 3890, "dist": 55.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 15.0, "gust": 31.0, "dir": 265, "age_min": 36, "trend": "up", "severity": "warning"},
+    {"id": "MTWGL", "name": "West Glacier (US-2)", "lat": 48.4942, "lon": -113.98215, "elev": 3241, "dist": 57.8, "sector": "UPWIND", "reporting": false, "stale": false, "sknt": null, "gust": null, "dir": null, "age_min": null, "trend": null, "severity": null},
+    {"id": "GPI", "name": "Kalispell Airport", "lat": 48.3042, "lon": -114.2636, "elev": 2979, "dist": 57.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 15.0, "gust": 32.2, "dir": 270, "age_min": 11, "trend": "down", "severity": "warning"},
+    {"id": "WGRM8", "name": "West Glacier RAWS", "lat": 48.51061, "lon": -113.99677, "elev": 3166, "dist": 59.1, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 8.1, "gust": 19.0, "dir": 263, "age_min": 54, "trend": "up", "severity": "good"},
+    {"id": "MTBMN", "name": "Blue Moon (US-2)", "lat": 48.37031, "lon": -114.24123, "elev": 3009, "dist": 59.8, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 35.0, "dir": 248, "age_min": 51, "trend": "up", "severity": "warning"},
+    {"id": "MTHLM", "name": "Helmville (MT-200)", "lat": 46.96826, "lon": -112.97487, "elev": 4327, "dist": 60.1, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 12.0, "gust": 21.1, "dir": 270, "age_min": 51, "trend": "flat", "severity": "warning"},
+    {"id": "MTBOW", "name": "Bowmans (MT-200)", "lat": 47.2922, "lon": -112.15183, "elev": 4222, "dist": 62.5, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 28.0, "dir": 270, "age_min": 51, "trend": "flat", "severity": "warning"},
+    {"id": "1GM", "name": "Golf (Ovando)", "lat": 47.33, "lon": -112.1, "elev": 4333, "dist": 63.0, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 24.2, "gust": 32.2, "dir": 260, "age_min": 11, "trend": "flat", "severity": "serious"},
+    {"id": "MTGRN", "name": "Greenough Hill (MT-200)", "lat": 46.9028, "lon": -113.42299, "elev": 4091, "dist": 63.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 7.9, "gust": 22.0, "dir": 292, "age_min": 51, "trend": "flat", "severity": "good"},
+    {"id": "SRYM8", "name": "St. Mary RAWS", "lat": 48.7375, "lon": -113.4306, "elev": 4593, "dist": 64.0, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 14.0, "gust": 26.0, "dir": 215, "age_min": 55, "trend": "up", "severity": "warning"},
+    {"id": "PNTM8", "name": "Point Six RAWS — summit site", "lat": 47.0411, "lon": -113.98623, "elev": 7856, "dist": 64.1, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 20.9, "gust": 33.0, "dir": 275, "age_min": 67, "trend": "flat", "severity": "warning", "special": "summit"},
+    {"id": "MTROG", "name": "Rogers Pass (pass, not valley)", "lat": 47.0877, "lon": -112.37232, "elev": 5390, "dist": 64.8, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 7.0, "gust": 14.0, "dir": 112, "age_min": 51, "trend": "down", "severity": "good"},
+    {"id": "LNCM8", "name": "Lincoln RAWS", "lat": 46.9681, "lon": -112.6353, "elev": 4642, "dist": 65.3, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 4.0, "gust": 22.0, "dir": 259, "age_min": 63, "trend": "down", "severity": "good"},
+    {"id": "STKM8", "name": "Stinkwater RAWS", "lat": 46.8536, "lon": -113.3939, "elev": 5673, "dist": 67.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 2.0, "gust": 12.0, "dir": 300, "age_min": 69, "trend": "flat", "severity": "good"},
+    {"id": "FINM8", "name": "Finneys Meadow RAWS", "lat": 47.04583, "lon": -114.11194, "elev": 4410, "dist": 67.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 4.0, "gust": 14.0, "dir": 233, "age_min": 38, "trend": "flat", "severity": "good"},
+    {"id": "CTB", "name": "Cut Bank (AWOS)", "lat": 48.60835, "lon": -112.37615, "elev": 3855, "dist": 67.4, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 26.5, "gust": 36.8, "dir": 250, "age_min": 10, "trend": "flat", "severity": "serious"},
+    {"id": "HOTM8", "name": "Hot Springs RAWS", "lat": 47.6156, "lon": -114.6694, "elev": 2989, "dist": 67.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 14.0, "gust": 26.0, "dir": 244, "age_min": 51, "trend": "flat", "severity": "warning"},
+    {"id": "MTVAR", "name": "Valier Jct (I-15)", "lat": 48.29242, "lon": -111.93673, "elev": 3668, "dist": 68.5, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 31.0, "dir": 292, "age_min": 51, "trend": "up", "severity": "warning"},
+    {"id": "MTEVH", "name": "Evaro Hill (US-93)", "lat": 47.02207, "lon": -114.11241, "elev": 3793, "dist": 68.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 2.0, "gust": 13.0, "dir": 135, "age_min": 50, "trend": "flat", "severity": "good"},
+    {"id": "MTTRV", "name": "Teton River (I-15)", "lat": 47.92931, "lon": -111.73664, "elev": 3392, "dist": 70.1, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 28.0, "dir": 292, "age_min": 51, "trend": "flat", "severity": "warning"},
+    {"id": "MTFPS", "name": "Flesher Pass (pass, not valley)", "lat": 46.97488, "lon": -112.35798, "elev": 6138, "dist": 71.5, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 17.0, "gust": 33.9, "dir": 338, "age_min": 51, "trend": "flat", "severity": "warning"},
+    {"id": "BOOM8", "name": "Boorman RAWS", "lat": 48.1333, "lon": -114.7166, "elev": 3917, "dist": 71.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 4.9, "gust": 16.0, "dir": 222, "age_min": 51, "trend": "flat", "severity": "good"},
+    {"id": "MTBON", "name": "Bonner (I-90)", "lat": 46.87143, "lon": -113.88582, "elev": 3274, "dist": 72.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 36.9, "dir": 315, "age_min": 51, "trend": "up", "severity": "warning"},
+    {"id": "MSO", "name": "Missoula/Bell Field", "lat": 46.9208, "lon": -114.0925, "elev": 3189, "dist": 73.8, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 18.4, "gust": 25.3, "dir": 290, "age_min": 13, "trend": "flat", "severity": "warning"},
+    {"id": "NINM8", "name": "Nine Mile RAWS", "lat": 47.0708, "lon": -114.4022, "elev": 3307, "dist": 75.0, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 13.0, "gust": 26.0, "dir": 215, "age_min": 67, "trend": null, "severity": "warning"},
+  ];
+
+  const special = [
+    { id: "BADM8/SNTL", name: "Badger Pass — ridge SNOTEL", elev: 6870, lat: 48.13091, lon: -113.02311, sector: "cross-stream", shape: "ridge" },
+    { id: "SPBM8", name: "Spotted Bear Lookout — expected, not reporting any cycle", elev: 7113, lat: 47.9044, lon: -113.4394, sector: "UPWIND", shape: "ghost" }
+  ];
+
+  const svg = document.getElementById("stationMap");
+  const mTip = document.getElementById("mapTooltip");
+  let mPinned = null;
+  const SZ = 640, CX = 320, CY = 320;
+  const PXPMI = 3.0; // pixels per mile
+
+  function toXY(lat, lon) {
+    const xmi = (lon - FIRE.lon) * MI_PER_DEG_LON;
+    const ymi = (lat - FIRE.lat) * MI_PER_DEG_LAT;
+    return [CX + xmi * PXPMI, CY - ymi * PXPMI];
+  }
+  function sectorColor(sector) {
+    if (sector === "UPWIND") return "var(--series-1)";
+    if (sector === "DOWNWIND") return "var(--series-2)";
+    return "var(--text-muted)";
+  }
+  function severityColor(sev) {
+    if (sev === "good") return "var(--good)";
+    if (sev === "warning") return "var(--warning)";
+    if (sev === "serious") return "var(--serious)";
+    if (sev === "critical") return "var(--critical)";
+    return "var(--text-muted)";
+  }
+  // Wind "direction" is meteorological (where wind is FROM), so the flow
+  // arrow points the opposite way (dir + 180) -- shows where the wind is
+  // actually headed, which is what matters for a fire.
+  function drawWindArrow(svg, el, x, y, dirDeg, sknt, sev) {
+    if (dirDeg == null || sknt == null) return;
+    const flowDeg = (dirDeg + 180) % 360;
+    const len = 7 + Math.min(sknt, 35) * 0.47;
+    const [tx, ty] = polarPoint(x, y, len, flowDeg);
+    const color = severityColor(sev);
+    svg.appendChild(el("line", { x1: x, y1: y, x2: tx, y2: ty, class: "wind-arrow", stroke: color }));
+    const back1 = polarPoint(tx, ty, 4, flowDeg + 145);
+    const back2 = polarPoint(tx, ty, 4, flowDeg - 145);
+    svg.appendChild(el("polyline", {
+      points: `${back1[0]},${back1[1]} ${tx},${ty} ${back2[0]},${back2[1]}`,
+      class: "wind-arrow", stroke: color,
+    }));
+  }
+
+  const ns = "http://www.w3.org/2000/svg";
+  function el(tag, attrs) {
+    const e = document.createElementNS(ns, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function polarPoint(cx, cy, r, deg) {
+    const rad = (deg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+  }
+  function wedgePath(cx, cy, r, startDeg, endDeg) {
+    const [x1, y1] = polarPoint(cx, cy, r, startDeg);
+    const [x2, y2] = polarPoint(cx, cy, r, endDeg);
+    let sweep = endDeg - startDeg; if (sweep < 0) sweep += 360;
+    const large = sweep > 180 ? 1 : 0;
+    return `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z`;
+  }
+
+  const maxR = 78 * PXPMI;
+  // sector wedges (background)
+  svg.appendChild(el("path", { d: wedgePath(CX, CY, maxR, 180, 330), class: "wedge-upwind" }));
+  svg.appendChild(el("path", { d: wedgePath(CX, CY, maxR, 20, 140), class: "wedge-downwind" }));
+
+  // range rings
+  [25, 50, 75].forEach(mi => {
+    const r = mi * PXPMI;
+    svg.appendChild(el("circle", { cx: CX, cy: CY, r: r, fill: "none", class: "gridline" }));
+    const t = el("text", { x: CX + 4, y: CY - r - 3, class: "ring-label" });
+    t.textContent = mi + " mi";
+    svg.appendChild(t);
+  });
+
+  // compass
+  const compass = { N: 0, E: 90, S: 180, W: 270 };
+  Object.keys(compass).forEach(k => {
+    const [x, y] = polarPoint(CX, CY, maxR + 16, compass[k]);
+    const t = el("text", { x, y: y + 3, class: "compass-label", "text-anchor": "middle" });
+    t.textContent = k;
+    svg.appendChild(t);
+  });
+
+  // station dots
+  stations.forEach(s => {
+    const [x, y] = toXY(s.lat, s.lon);
+    const color = sectorColor(s.sector);
+    let attrs = { cx: x, cy: y, r: 5, class: "station-dot", stroke: color };
+    if (s.special === "summit") {
+      const pts = `${x},${y-7} ${x+6.5},${y+5} ${x-6.5},${y+5}`;
+      const tri = el("polygon", { points: pts, fill: color, stroke: "var(--surface-1)", "stroke-width": 1.2, class: "station-dot" });
+      attachHover(tri, s);
+      svg.appendChild(tri);
+      const lbl = el("text", { x: x + 9, y: y + 3, class: "special-label" });
+      lbl.textContent = s.id;
+      svg.appendChild(lbl);
+      if (s.sknt != null) {
+        const wl = el("text", { x: x + 9, y: y + 14, class: "wind-label" });
+        wl.textContent = s.sknt + " mph";
+        svg.appendChild(wl);
+      }
+      drawWindArrow(svg, el, x, y, s.dir, s.sknt, s.severity);
+      return;
+    }
+    if (!s.reporting) { attrs.fill = "none"; }
+    else { attrs.fill = color; attrs.opacity = 0.9; }
+    if (s.stale) { attrs["stroke-dasharray"] = "2 2"; if (s.reporting) attrs.fill = color; attrs.stroke = "var(--text-muted)"; }
+    if (!s.reporting) attrs.stroke = "var(--text-muted)";
+    const dot = el("circle", attrs);
+    attachHover(dot, s);
+    svg.appendChild(dot);
+    if (s.reporting && s.sknt != null) {
+      const wl = el("text", { x: x + 7, y: y + 3, class: "wind-label" });
+      wl.textContent = s.sknt;
+      svg.appendChild(wl);
+      drawWindArrow(svg, el, x, y, s.dir, s.sknt, s.severity);
+    }
+  });
+
+  // special sites: Badger Pass (ridge/diamond), SPBM8 (ghost)
+  special.forEach(s => {
+    const [x, y] = toXY(s.lat, s.lon);
+    const color = sectorColor(s.sector);
+    if (s.shape === "ridge") {
+      const rect = el("rect", { x: x - 6, y: y - 6, width: 12, height: 12, transform: `rotate(45 ${x} ${y})`, fill: color, stroke: "var(--surface-1)", "stroke-width": 1.2, class: "station-dot" });
+      attachHover(rect, { id: s.id, name: s.name, elev: s.elev, dist: null, sector: s.sector, sknt: null, gust: null });
+      svg.appendChild(rect);
+      const lbl = el("text", { x: x + 10, y: y + 3, class: "special-label" });
+      lbl.textContent = "Badger Pass";
+      svg.appendChild(lbl);
+    } else {
+      const ghost = el("circle", { cx: x, cy: y, r: 6, fill: "none", stroke: "var(--warning)", "stroke-width": 1.6, "stroke-dasharray": "2.5 2.5", class: "station-dot" });
+      attachHover(ghost, { id: s.id, name: s.name, elev: s.elev, dist: null, sector: s.sector, sknt: null, gust: null });
+      svg.appendChild(ghost);
+      const lbl = el("text", { x: x + 10, y: y + 3, class: "special-label", fill: "var(--warning)" });
+      lbl.textContent = "SPBM8 (silent)";
+      svg.appendChild(lbl);
+    }
+  });
+
+  // fire marker on top
+  const [fx, fy] = toXY(FIRE.lat, FIRE.lon);
+  const flame = el("path", {
+    d: `M${fx},${fy-10} C${fx+6},${fy-4} ${fx+5},${fy+2} ${fx},${fy+9} C${fx-5},${fy+2} ${fx-6},${fy-4} ${fx},${fy-10} Z`,
+    class: "fire-marker"
+  });
+  svg.appendChild(flame);
+  const fireLbl = el("text", { x: fx, y: fy + 22, class: "special-label", "text-anchor": "middle", "font-weight": "700" });
+  fireLbl.textContent = "SILVERTIP FIRE";
+  svg.appendChild(fireLbl);
+
+  function attachHover(node, s) {
+    function show() {
+      const windText = s.id === "SPBM8"
+        ? "no observations, any cycle"
+        : (s.sknt == null ? "no wind data" : `${s.sknt} mph sustained, ${s.gust == null ? "—" : s.gust + " mph gust"}`);
+      const dirText = s.dir == null ? "—" : s.dir + "°";
+      mTip.innerHTML = `
+        <div class="t-title">${s.id}</div>
+        <div style="color:var(--text-secondary); margin-bottom:4px;">${s.name}</div>
+        ${s.dist !== null ? `<div class="t-row"><span>Distance</span><span>${s.dist} mi</span></div>` : ""}
+        <div class="t-row"><span>Elevation</span><span>${s.elev != null ? s.elev.toLocaleString() + " ft" : "unknown"}</span></div>
+        <div class="t-row"><span>Sector</span><span>${s.sector}</span></div>
+        <div class="t-row"><span>Wind speed</span><span>${windText}</span></div>
+        <div class="t-row"><span>Wind direction</span><span>${dirText}</span></div>
+      `;
+      const pt = node.getBBox ? node.getBBox() : {x:0,y:0};
+      mTip.style.opacity = "1";
+      mTip.style.left = ((pt.x / SZ) * 100) + "%";
+      mTip.style.top = ((pt.y / SZ) * 100) + "%";
+    }
+    node.addEventListener("mouseenter", () => { if (!mPinned) show(); });
+    node.addEventListener("mouseleave", () => { if (!mPinned) mTip.style.opacity = "0"; });
+    node.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (mPinned === node) { mPinned = null; mTip.style.opacity = "0"; }
+      else { mPinned = node; show(); }
+    });
+  }
+  svg.addEventListener("click", () => { if (mPinned) { mPinned = null; mTip.style.opacity = "0"; } });
+
+  // ---- geographic maps (real hillshade terrain tiles + true Mercator projection) ----
+  (function() {
+    const terrainNetwork = {"zoom": 9, "viewMinX": 23552, "viewMinY": 45056, "viewW": 1536, "viewH": 1280, "tiles": [{"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/176/92", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/176/92", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/176/92"}, "x": 23552, "y": 45056}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/176/93", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/176/93", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/176/93"}, "x": 23808, "y": 45056}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/176/94", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/176/94", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/176/94"}, "x": 24064, "y": 45056}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/176/95", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/176/95", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/176/95"}, "x": 24320, "y": 45056}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/176/96", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/176/96", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/176/96"}, "x": 24576, "y": 45056}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/176/97", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/176/97", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/176/97"}, "x": 24832, "y": 45056}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/177/92", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/177/92", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/177/92"}, "x": 23552, "y": 45312}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/177/93", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/177/93", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/177/93"}, "x": 23808, "y": 45312}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/177/94", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/177/94", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/177/94"}, "x": 24064, "y": 45312}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/177/95", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/177/95", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/177/95"}, "x": 24320, "y": 45312}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/177/96", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/177/96", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/177/96"}, "x": 24576, "y": 45312}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/177/97", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/177/97", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/177/97"}, "x": 24832, "y": 45312}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/178/92", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/178/92", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/178/92"}, "x": 23552, "y": 45568}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/178/93", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/178/93", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/178/93"}, "x": 23808, "y": 45568}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/178/94", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/178/94", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/178/94"}, "x": 24064, "y": 45568}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/178/95", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/178/95", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/178/95"}, "x": 24320, "y": 45568}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/178/96", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/178/96", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/178/96"}, "x": 24576, "y": 45568}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/178/97", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/178/97", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/178/97"}, "x": 24832, "y": 45568}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/179/92", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/179/92", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/179/92"}, "x": 23552, "y": 45824}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/179/93", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/179/93", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/179/93"}, "x": 23808, "y": 45824}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/179/94", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/179/94", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/179/94"}, "x": 24064, "y": 45824}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/179/95", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/179/95", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/179/95"}, "x": 24320, "y": 45824}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/179/96", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/179/96", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/179/96"}, "x": 24576, "y": 45824}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/179/97", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/179/97", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/179/97"}, "x": 24832, "y": 45824}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/180/92", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/180/92", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/180/92"}, "x": 23552, "y": 46080}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/180/93", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/180/93", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/180/93"}, "x": 23808, "y": 46080}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/180/94", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/180/94", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/180/94"}, "x": 24064, "y": 46080}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/180/95", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/180/95", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/180/95"}, "x": 24320, "y": 46080}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/180/96", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/180/96", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/180/96"}, "x": 24576, "y": 46080}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/180/97", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/180/97", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/9/180/97"}, "x": 24832, "y": 46080}], "stations": [{"id": "GPKM8", "name": "Gate Park RAWS", "lat": 47.78972, "lon": -112.93944, "elev": 5319, "dist": 14.1, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 11.0, "gust": 23.0, "dir": 202, "age_min": 56, "severity": "good", "trend": "down", "tx": 24416.004778666666, "ty": 45676.70242990927}, {"id": "GSNM8", "name": "Gleason RAWS", "lat": 47.8677, "lon": -112.668, "elev": 5157, "dist": 26.7, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 9.0, "gust": 29.0, "dir": 237, "age_min": 57, "severity": "good", "trend": "flat", "tx": 24514.833066666666, "ty": 45634.41198721054}, {"id": "BEFM8", "name": "Benchmark", "lat": 47.4889, "lon": -112.88, "elev": 5344, "dist": 28.4, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 11.0, "gust": 23.0, "dir": 228, "age_min": 58, "severity": "good", "trend": "flat", "tx": 24437.646222222225, "ty": 45839.25269102033}, {"id": "SWLM8", "name": "Swan Lake (bad temp sensor)", "lat": 47.9204, "lon": -113.8395, "elev": 3084, "dist": 28.6, "sector": "UPWIND", "reporting": false, "stale": false, "sknt": null, "gust": null, "dir": null, "age_min": 21, "severity": null, "trend": null, "tx": 24088.302933333332, "ty": 45605.79545950072}, {"id": "MTSWN", "name": "Swan Lake South (MT-83)", "lat": 47.59103, "lon": -113.75574, "elev": 3550, "dist": 28.7, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 6.0, "gust": 12.0, "dir": 292, "age_min": 51, "severity": "good", "trend": "up", "tx": 24118.799018666665, "ty": 45784.170852550946}, {"id": "CONM8", "name": "Condon RAWS", "lat": 47.5361, "lon": -113.7172, "elev": 3707, "dist": 29.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 4.9, "gust": 15.0, "dir": 283, "age_min": 58, "severity": "good", "trend": "flat", "tx": 24132.831004444444, "ty": 45813.809619307736}, {"id": "FIEM8", "name": "Fielding RAWS (stale since Jul 23)", "lat": 48.28, "lon": -113.4333, "elev": 4862, "dist": 33.0, "sector": "cross-stream", "reporting": true, "stale": true, "sknt": 0.0, "gust": 3.0, "dir": 203, "age_min": 13464, "severity": "good", "trend": "flat", "tx": 24236.19584, "ty": 45409.74688193399}, {"id": "MTESX", "name": "Essex (US-2)", "lat": 48.28176, "lon": -113.60657, "elev": 3848, "dist": 36.1, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 4.0, "gust": 19.0, "dir": 135, "age_min": 51, "severity": "good", "trend": "flat", "tx": 24173.11015822222, "ty": 45408.783972531564}, {"id": "MTYLW", "name": "Yellow Bay (MT-35)", "lat": 47.88485, "lon": -114.02916, "elev": 3051, "dist": 36.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 2.0, "gust": 11.0, "dir": 270, "age_min": 51, "severity": "good", "trend": "down", "tx": 24019.249834666665, "ty": 45625.10259421432}, {"id": "DCRM8", "name": "Deep Creek RAWS", "lat": 48.3555, "lon": -113.1138, "elev": 5240, "dist": 37.5, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 23.0, "gust": 38.0, "dir": 236, "age_min": 45, "severity": "serious", "trend": "down", "tx": 24352.522240000002, "ty": 45368.41040262568}, {"id": "RONM8", "name": "Ronan RAWS", "lat": 47.8833, "lon": -114.1667, "elev": 2890, "dist": 43.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 6.0, "gust": 18.0, "dir": 270, "age_min": 35, "severity": "good", "trend": "flat", "tx": 23969.173048888886, "ty": 45625.944094601036}, {"id": "7S0", "name": "Ronan Airport", "lat": 47.5683, "lon": -114.1001, "elev": 3079, "dist": 43.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 17.3, "gust": 27.6, "dir": 260, "age_min": 11, "severity": "warning", "trend": "up", "tx": 23993.42136888889, "ty": 45796.43912557654}, {"id": "MTBRN", "name": "Two Medicine Bridge (US-2)", "lat": 48.45265, "lon": -113.19507, "elev": 4915, "dist": 43.8, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 26.0, "gust": 38.0, "dir": 270, "age_min": 51, "severity": "serious", "trend": "up", "tx": 24322.932736, "ty": 45315.13025843571}, {"id": "SEEM8", "name": "Seeley Lake RAWS", "lat": 47.1827, "lon": -113.4472, "elev": 4249, "dist": 45.1, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 9.0, "gust": 19.0, "dir": 298, "age_min": 54, "severity": "good", "trend": "flat", "tx": 24231.135004444448, "ty": 46003.756758472795}, {"id": "MTPND", "name": "Pendroy (US-89)", "lat": 48.07322, "lon": -112.33418, "elev": 4324, "dist": 45.4, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 27.0, "gust": 39.0, "dir": 248, "age_min": 51, "severity": "serious", "trend": "up", "tx": 24636.373219555553, "ty": 45522.64774444644}, {"id": "JETM8", "name": "Jette RAWS", "lat": 47.7669, "lon": -114.2347, "elev": 3635, "dist": 46.3, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 4.0, "gust": 10.0, "dir": 253, "age_min": 23, "severity": "good", "trend": "flat", "tx": 23944.415004444443, "ty": 45689.06626398147}, {"id": "KERM8", "name": "Flathead Lake 5 WSW (Kerr Dam)", "lat": 47.6775, "lon": -114.2419, "elev": 2733, "dist": 47.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 9.0, "gust": null, "dir": 207, "age_min": 36, "severity": "good", "trend": "flat", "tx": 23941.793564444444, "ty": 45737.45084196116}, {"id": "MTCTS", "name": "Choteau South (US-287)", "lat": 47.69807, "lon": -112.22771, "elev": 4573, "dist": 47.8, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 28.0, "gust": 38.0, "dir": 270, "age_min": 51, "severity": "serious", "trend": "flat", "tx": 24675.137763555555, "ty": 45726.32541070145}, {"id": "MTBWG", "name": "Browning (US-89)", "lat": 48.53523, "lon": -112.9813, "elev": 4403, "dist": 50.8, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 36.0, "gust": 42.0, "dir": 22, "age_min": 51, "severity": "critical", "trend": "up", "tx": 24400.764017777776, "ty": 45269.760553742686}, {"id": "MTELM", "name": "Elmo (US-93)", "lat": 47.82806, "lon": -114.34778, "elev": 2910, "dist": 51.4, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 14.0, "gust": 29.0, "dir": 248, "age_min": 51, "severity": "warning", "trend": "flat", "tx": 23903.24383288889, "ty": 45655.91765964965}, {"id": "BGRM8", "name": "Browning BFA RAWS", "lat": 48.5616, "lon": -113.0134, "elev": 4370, "dist": 52.3, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 13.0, "gust": 28.0, "dir": 230, "age_min": 45, "severity": "warning", "trend": "flat", "tx": 24389.076764444442, "ty": 45255.257209833086}, {"id": "MTFLT", "name": "Flathead River (MT-35)", "lat": 48.21908, "lon": -114.23793, "elev": 3009, "dist": 53.7, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 13.0, "gust": 23.0, "dir": 270, "age_min": 51, "severity": "warning", "trend": "up", "tx": 23943.23899733333, "ty": 45443.05625264937}, {"id": "HNYM8", "name": "Hungry Horse RAWS", "lat": 48.3847, "lon": -114.0575, "elev": 3123, "dist": 54.3, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 10.0, "gust": 36.0, "dir": 295, "age_min": 55, "severity": "good", "trend": "up", "tx": 24008.931555555555, "ty": 45352.40688901354}, {"id": "MTHGH", "name": "Hungry Horse (RWIS)", "lat": 48.38485, "lon": -114.07805, "elev": 3041, "dist": 54.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 6.0, "gust": 23.0, "dir": 315, "age_min": 51, "severity": "good", "trend": "up", "tx": 24001.449528888887, "ty": 45352.32465548573}, {"id": "PSTM8", "name": "Pistol Creek RAWS", "lat": 47.2167, "lon": -114.0167, "elev": 5509, "dist": 55.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 11.0, "gust": 19.0, "dir": 254, "age_min": 25, "severity": "good", "trend": "up", "tx": 24023.78638222222, "ty": 45985.537446878065}, {"id": "CLWM8", "name": "Clearwater", "lat": 47.01361, "lon": -113.33306, "elev": 3890, "dist": 55.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 15.0, "gust": 31.0, "dir": 265, "age_min": 36, "severity": "warning", "trend": "up", "tx": 24272.692110222222, "ty": 46094.19284447642}, {"id": "MTWGL", "name": "West Glacier (US-2)", "lat": 48.4942, "lon": -113.98215, "elev": 3241, "dist": 57.8, "sector": "UPWIND", "reporting": false, "stale": false, "sknt": null, "gust": null, "dir": null, "age_min": null, "trend": null, "severity": null, "tx": 24036.36565333333, "ty": 45292.31179789442}, {"id": "GPI", "name": "Kalispell Airport", "lat": 48.3042, "lon": -114.2636, "elev": 2979, "dist": 57.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 15.0, "gust": 32.2, "dir": 270, "age_min": 11, "severity": "warning", "trend": "down", "tx": 23933.892835555558, "ty": 45396.50396834414}, {"id": "WGRM8", "name": "West Glacier RAWS", "lat": 48.51061, "lon": -113.99677, "elev": 3166, "dist": 59.1, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 8.1, "gust": 19.0, "dir": 263, "age_min": 54, "severity": "good", "trend": "up", "tx": 24031.042673777778, "ty": 45283.29459076424}, {"id": "MTBMN", "name": "Blue Moon (US-2)", "lat": 48.37031, "lon": -114.24123, "elev": 3009, "dist": 59.8, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 35.0, "dir": 248, "age_min": 51, "severity": "warning", "trend": "up", "tx": 23942.037504, "ty": 45360.29469890431}, {"id": "MTHLM", "name": "Helmville (MT-200)", "lat": 46.96826, "lon": -112.97487, "elev": 4327, "dist": 60.1, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 12.0, "gust": 21.1, "dir": 270, "age_min": 51, "severity": "warning", "trend": "flat", "tx": 24403.105109333334, "ty": 46118.39910769958}, {"id": "MTBOW", "name": "Bowmans (MT-200)", "lat": 47.2922, "lon": -112.15183, "elev": 4222, "dist": 62.5, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 28.0, "dir": 270, "age_min": 51, "severity": "warning", "trend": "flat", "tx": 24702.764828444444, "ty": 45945.03803992814}, {"id": "1GM", "name": "Golf (Ovando)", "lat": 47.33, "lon": -112.1, "elev": 4333, "dist": 63.0, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 24.2, "gust": 32.2, "dir": 260, "age_min": 11, "severity": "serious", "trend": "flat", "tx": 24721.635555555556, "ty": 45924.73979499853}, {"id": "MTGRN", "name": "Greenough Hill (MT-200)", "lat": 46.9028, "lon": -113.42299, "elev": 4091, "dist": 63.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 7.9, "gust": 22.0, "dir": 292, "age_min": 51, "severity": "good", "trend": "flat", "tx": 24239.949596444443, "ty": 46153.303230314355}, {"id": "SRYM8", "name": "St. Mary RAWS", "lat": 48.7375, "lon": -113.4306, "elev": 4593, "dist": 64.0, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 14.0, "gust": 26.0, "dir": 215, "age_min": 55, "severity": "warning", "trend": "up", "tx": 24237.17888, "ty": 45158.31923392236}, {"id": "PNTM8", "name": "Point Six RAWS \u2014 summit site", "lat": 47.0411, "lon": -113.98623, "elev": 7856, "dist": 64.1, "sector": "UPWIND", "special": "summit", "reporting": true, "stale": false, "sknt": 20.9, "gust": 33.0, "dir": 275, "age_min": 67, "severity": "warning", "trend": "flat", "tx": 24034.880170666664, "ty": 46079.509624406}, {"id": "MTROG", "name": "Rogers Pass (pass, not valley)", "lat": 47.0877, "lon": -112.37232, "elev": 5390, "dist": 64.8, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 7.0, "gust": 14.0, "dir": 112, "age_min": 51, "severity": "good", "trend": "down", "tx": 24622.486869333334, "ty": 46054.60189656752}, {"id": "LNCM8", "name": "Lincoln RAWS", "lat": 46.9681, "lon": -112.6353, "elev": 4642, "dist": 65.3, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 4.0, "gust": 22.0, "dir": 259, "age_min": 63, "severity": "good", "trend": "down", "tx": 24526.738773333334, "ty": 46118.48447382607}, {"id": "STKM8", "name": "Stinkwater RAWS", "lat": 46.8536, "lon": -113.3939, "elev": 5673, "dist": 67.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 2.0, "gust": 12.0, "dir": 300, "age_min": 69, "severity": "good", "trend": "flat", "tx": 24250.540942222222, "ty": 46179.5092647564}, {"id": "FINM8", "name": "Finneys Meadow RAWS", "lat": 47.04583, "lon": -114.11194, "elev": 4410, "dist": 67.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 4.0, "gust": 14.0, "dir": 233, "age_min": 38, "severity": "good", "trend": "flat", "tx": 23989.110556444444, "ty": 46076.98242909764}, {"id": "CTB", "name": "Cut Bank (AWOS)", "lat": 48.60835, "lon": -112.37615, "elev": 3855, "dist": 67.4, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 26.5, "gust": 36.8, "dir": 250, "age_min": 10, "severity": "serious", "trend": "flat", "tx": 24621.09240888889, "ty": 45229.526390057574}, {"id": "HOTM8", "name": "Hot Springs RAWS", "lat": 47.6156, "lon": -114.6694, "elev": 2989, "dist": 67.9, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 14.0, "gust": 26.0, "dir": 244, "age_min": 51, "severity": "warning", "trend": "flat", "tx": 23786.145564444447, "ty": 45770.90346500222}, {"id": "MTVAR", "name": "Valier Jct (I-15)", "lat": 48.29242, "lon": -111.93673, "elev": 3668, "dist": 68.5, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 31.0, "dir": 292, "age_min": 51, "severity": "warning", "trend": "up", "tx": 24781.080348444444, "ty": 45402.95109620772}, {"id": "MTEVH", "name": "Evaro Hill (US-93)", "lat": 47.02207, "lon": -114.11241, "elev": 3793, "dist": 68.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 2.0, "gust": 13.0, "dir": 135, "age_min": 50, "severity": "good", "trend": "flat", "tx": 23988.939434666667, "ty": 46089.67491428988}, {"id": "MTTRV", "name": "Teton River (I-15)", "lat": 47.92931, "lon": -111.73664, "elev": 3392, "dist": 70.1, "sector": "DOWNWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 28.0, "dir": 292, "age_min": 51, "severity": "warning", "trend": "flat", "tx": 24853.930894222223, "ty": 45600.95437708324}, {"id": "MTFPS", "name": "Flesher Pass (pass, not valley)", "lat": 46.97488, "lon": -112.35798, "elev": 6138, "dist": 71.5, "sector": "cross-stream", "reporting": true, "stale": false, "sknt": 17.0, "gust": 33.9, "dir": 338, "age_min": 51, "severity": "warning", "trend": "flat", "tx": 24627.707904000003, "ty": 46114.8668603372}, {"id": "BOOM8", "name": "Boorman RAWS", "lat": 48.1333, "lon": -114.7166, "elev": 3917, "dist": 71.6, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 4.9, "gust": 16.0, "dir": 222, "age_min": 51, "severity": "good", "trend": "flat", "tx": 23768.960568888888, "ty": 45489.89125328907}, {"id": "MTBON", "name": "Bonner (I-90)", "lat": 46.87143, "lon": -113.88582, "elev": 3274, "dist": 72.2, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 21.1, "gust": 36.9, "dir": 315, "age_min": 51, "severity": "warning", "trend": "up", "tx": 24071.438336000003, "ty": 46170.015016300065}, {"id": "MSO", "name": "Missoula/Bell Field", "lat": 46.9208, "lon": -114.0925, "elev": 3189, "dist": 73.8, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 18.4, "gust": 25.3, "dir": 290, "age_min": 13, "severity": "warning", "trend": "flat", "tx": 23996.188444444444, "ty": 46143.70964846575}, {"id": "NINM8", "name": "Nine Mile RAWS", "lat": 47.0708, "lon": -114.4022, "elev": 3307, "dist": 75.0, "sector": "UPWIND", "reporting": true, "stale": false, "sknt": 13.0, "gust": 26.0, "dir": 215, "age_min": 67, "severity": "warning", "trend": null, "tx": 23883.43011555556, "ty": 46063.6374732475}], "special": [{"id": "BADM8/SNTL", "name": "Badger Pass \u2014 ridge SNOTEL", "elev": 6870, "lat": 48.13091, "lon": -113.02311, "sector": "cross-stream", "shape": "ridge", "tx": 24385.541461333334, "ty": 45491.19504769461}, {"id": "SPBM8", "name": "Spotted Bear Lookout \u2014 expected, not reporting any cycle", "elev": 7113, "lat": 47.9044, "lon": -113.4394, "sector": "UPWIND", "shape": "ghost", "tx": 24233.974897777774, "ty": 45614.48666877723}], "fire": {"tx": 24306.574222222225, "ty": 45660.28839761081}, "perimeterPolygon": [[24310.580656355556, 45646.0066933733], [24310.90105457778, 45646.043583913706], [24310.98406684445, 45646.14557515614], [24311.088924444448, 45646.34575901973], [24311.552045511115, 45646.59422373152], [24312.09271751111, 45646.621891063725], [24312.487025777777, 45646.72496519891], [24312.76045653333, 45646.952811947674], [24312.97089991111, 45647.13129061219], [24313.55853937778, 45647.368898749424], [24313.900782933335, 45647.48173478771], [24314.110498133334, 45647.683536574295], [24314.203704888892, 45647.92439487666], [24314.189505422222, 45648.218412802904], [24314.07408924444, 45648.67245290149], [24313.88840391111, 45648.97514223069], [24314.320941511112, 45649.25938515997], [24314.578352355555, 45649.10424529105], [24314.867803022225, 45649.23389020529], [24315.204221155556, 45649.49155091857], [24315.42194631111, 45650.05134459051], [24315.101184000003, 45650.158745591594], [24314.69194808889, 45650.28675837071], [24314.33732551111, 45650.48257340191], [24314.20516124444, 45650.84653622517], [24314.17494186667, 45651.304330767714], [24314.23246791111, 45651.7078780753], [24313.959401244443, 45652.02029782339], [24313.97032391111, 45652.51929439431], [24314.298368, 45653.26994213588], [24314.238657422226, 45653.93975901973], [24314.276886755553, 45654.29879600161], [24314.169116444446, 45654.639931126425], [24314.200064, 45655.29669950929], [24313.790828088888, 45655.89650926755], [24313.903331555557, 45656.34825627979], [24314.304193422224, 45657.0825330723], [24314.442911288887, 45657.44857971015], [24314.493519644446, 45657.94910688955], [24314.4589312, 45658.48866847428], [24314.338417777777, 45658.98809264369], [24314.233924266664, 45659.362790518775], [24314.159650133333, 45660.01836423972], [24314.01984, 45660.38871055263], [24314.2754304, 45661.13914846458], [24315.067687822222, 45662.302721450935], [24314.82957368889, 45662.7310516794], [24315.02654577778, 45663.88588425462], [24315.2781312, 45664.907844465895], [24315.26575217778, 45666.17480676422], [24315.670983111115, 45666.69306844956], [24314.910765511115, 45667.25252014751], [24314.036952177776, 45667.04435337242], [24313.36739271111, 45666.639399533684], [24313.061193955557, 45666.39490651145], [24312.63411768889, 45666.84756930273], [24311.804359111113, 45667.25685693902], [24311.330315377774, 45667.5251946106], [24311.648529066668, 45668.61207154802], [24311.97875768889, 45669.01211843142], [24311.8145536, 45669.818699743526], [24311.506534399996, 45670.136881043436], [24311.146086400004, 45670.784073479415], [24310.814037333337, 45670.68542366696], [24310.283195733336, 45670.55587750915], [24309.78839893333, 45670.99383869013], [24309.1668992, 45671.48111670173], [24308.495883377775, 45671.66811214261], [24307.900598044445, 45671.94887397999], [24307.17023573333, 45672.14182836881], [24306.704566044442, 45672.53477914582], [24306.270207999998, 45672.5808488778], [24305.79543608889, 45672.604696709466], [24305.528923022226, 45671.851854279346], [24304.773802666667, 45671.72448153923], [24304.3303424, 45672.045351339664], [24303.888702577777, 45672.47515938078], [24303.445970488887, 45671.91526942882], [24303.167078399998, 45671.75104015809], [24302.55795768889, 45671.65564581851], [24301.98488177778, 45672.18518872375], [24301.720553244442, 45671.83776200452], [24301.919345777776, 45671.167828803395], [24301.482075022224, 45671.02039799812], [24301.21701831111, 45670.58948368269], [24301.01349262222, 45669.933614017835], [24300.126207999998, 45669.3785520527], [24300.453159822224, 45668.44728093504], [24300.340656355555, 45667.93393031105], [24299.14498844444, 45667.4324964313], [24299.23200568889, 45666.54940900083], [24298.80529351111, 45666.1341477557], [24299.02884408889, 45665.3616154365], [24298.79619128889, 45664.551111375826], [24298.580286577777, 45664.11088133177], [24298.87155768889, 45663.191906039734], [24298.34180835555, 45662.51309204838], [24298.381494044446, 45661.235120656434], [24298.16267662222, 45660.40118186636], [24297.18837475556, 45660.159888076465], [24296.458740622224, 45659.74073686841], [24296.762754844443, 45658.96748682721], [24296.864699733334, 45658.38238379416], [24296.54648604444, 45657.919281575734], [24296.469299200002, 45657.2143104103], [24295.733839644447, 45656.73980064597], [24295.50883271111, 45656.05378095884], [24294.688540444444, 45654.75111099711], [24293.401122133335, 45653.454346754836], [24292.194167466667, 45652.79048447216], [24293.70076728889, 45652.28335690086], [24294.00878648889, 45651.63194219596], [24294.99692373333, 45650.63011180518], [24296.353154844444, 45649.63855207915], [24296.77331342222, 45650.10884214709], [24297.177452088887, 45650.272655296474], [24297.398089955557, 45650.57912435621], [24297.858298311112, 45649.8338291861], [24298.43647146667, 45649.74595465566], [24298.828959288887, 45649.99655907343], [24298.913792000003, 45650.611127127464], [24299.044864000003, 45650.7695131887], [24299.17011057778, 45651.02987190042], [24299.14280391111, 45651.32819662968], [24299.188679111114, 45651.68563973185], [24299.48177066667, 45651.74801552875], [24299.632867555552, 45651.4865786554], [24299.567331555554, 45651.27287119151], [24299.705321244444, 45651.00383613765], [24299.966372977775, 45650.75432552285], [24300.039918933333, 45650.37734333283], [24299.97948017778, 45650.00903499262], [24299.902657422223, 45649.59461454328], [24300.16116053333, 45649.41181196037], [24300.438232177774, 45649.328818110895], [24300.82343822222, 45649.14709869701], [24301.209372444446, 45648.97351487739], [24301.524673422224, 45648.85797255402], [24301.77079751111, 45648.70825503493], [24301.841794844444, 45648.42943115538], [24302.153090844444, 45648.16904838412], [24302.382830933333, 45648.13812777007], [24302.607109688888, 45648.15385931477], [24302.897652622225, 45648.25150318901], [24303.110644622226, 45648.27428671092], [24303.294145422224, 45648.47554035335], [24303.384075377777, 45648.60030603965], [24303.686997333334, 45648.53032883149], [24303.91309653333, 45648.472285588854], [24303.93858275556, 45648.063267195175], [24304.013585066667, 45647.86418049432], [24304.02341546667, 45647.57829603816], [24304.215654400003, 45647.26094461611], [24304.552072533334, 45647.22459815644], [24304.74394737778, 45646.953354437734], [24305.216898844443, 45646.59747871323], [24305.852598044446, 45646.47921413765], [24306.468272355556, 45646.168902888356], [24306.872046933335, 45646.92839988427], [24307.46988088889, 45647.125323258704], [24307.306769066665, 45646.90724274547], [24307.335532088888, 45646.63545347151], [24307.61806506667, 45646.669088214614], [24307.822318933337, 45646.570353854506], [24308.006547911114, 45646.51718905553], [24308.154368000003, 45646.40109414548], [24308.355709155556, 45646.28011622955], [24308.52828728889, 45646.19331561067], [24308.869438577778, 45646.13635255895], [24309.100270933333, 45646.122247404586], [24309.21532302222, 45646.12116239241], [24309.33328782222, 45646.13038499454], [24309.46253937778, 45646.14177761646], [24309.647132444443, 45646.25190605773], [24309.78985528889, 45646.32188893191], [24309.989740088888, 45646.360949065056], [24310.250063644442, 45646.257331093], [24310.366208, 45646.1103122684], [24310.580656355556, 45646.0066933733]]};
+    const terrainPerimeter = {"zoom": 13, "viewMinX": 388352, "viewMinY": 730112, "viewW": 768, "viewH": 768, "tiles": [{"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2852/1517", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2852/1517", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2852/1517"}, "x": 388352, "y": 730112}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2852/1518", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2852/1518", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2852/1518"}, "x": 388608, "y": 730112}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2852/1519", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2852/1519", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2852/1519"}, "x": 388864, "y": 730112}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2853/1517", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2853/1517", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2853/1517"}, "x": 388352, "y": 730368}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2853/1518", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2853/1518", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2853/1518"}, "x": 388608, "y": 730368}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2853/1519", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2853/1519", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2853/1519"}, "x": 388864, "y": 730368}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2854/1517", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2854/1517", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2854/1517"}, "x": 388352, "y": 730624}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2854/1518", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2854/1518", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2854/1518"}, "x": 388608, "y": 730624}, {"urls": {"topo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/13/2854/1519", "imagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2854/1519", "hillshade": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/13/2854/1519"}, "x": 388864, "y": 730624}], "polygon": [[388969.2905016889, 730336.1070939729], [388974.41687324445, 730336.6973426193], [388975.7450695112, 730338.3292024982], [388977.42279111117, 730341.5321443157], [388984.83272817783, 730345.5075797043], [388993.48348017776, 730345.9502570196], [388999.7924124444, 730347.5994431826], [389004.1673045333, 730351.2449911628], [389007.53439857776, 730354.100649795], [389016.9366300445, 730357.9023799908], [389022.41252693336, 730359.7077566034], [389025.76797013334, 730362.9365851887], [389027.2592782223, 730366.7903180266], [389027.03208675556, 730371.4946048465], [389025.18542791106, 730378.7592464238], [389022.2144625778, 730383.602275691], [389029.1350641778, 730388.1501625595], [389033.2536376889, 730385.6679246568], [389037.8848483556, 730387.7422432846], [389043.2675384889, 730391.8648146971], [389046.7511409778, 730400.8215134481], [389041.61894400005, 730402.5399294655], [389035.07116942224, 730404.5881339314], [389029.3972081778, 730407.7211744306], [389027.28257991106, 730413.5445796028], [389026.7990698667, 730420.8692922834], [389027.7194865778, 730427.3260492048], [389023.3504199111, 730432.3247651742], [389023.5251825778, 730440.308710309], [389028.773888, 730452.319074174], [389027.8185187556, 730463.0361443157], [389028.43018808885, 730468.7807360258], [389026.7058631111, 730474.2388980228], [389027.201024, 730484.7471921486], [389020.6532494222, 730494.3441482808], [389022.4533048889, 730501.5721004766], [389028.8670947556, 730513.3205291568], [389031.0865806222, 730519.1772753624], [389031.89631431113, 730527.1857102328], [389031.3428992, 730535.8186955885], [389029.41468444443, 730543.809482299], [389027.7427882666, 730549.8046483004], [389026.55440213333, 730560.2938278355], [389024.31744, 730566.2193688421], [389028.4068864, 730578.2263754333], [389041.08300515555, 730596.843543215], [389037.27317902225, 730603.6968268704], [389040.42473244446, 730622.1741480739], [389044.4500992, 730638.5255114543], [389044.2520348445, 730658.7969082275], [389050.73572977784, 730667.089095193], [389038.57224817784, 730676.0403223601], [389024.5912348444, 730672.7096539587], [389013.87828337774, 730666.230392539], [389008.9791032889, 730662.3185041832], [389002.1458830222, 730669.5611088437], [388988.8697457778, 730676.1097110243], [388981.2850460444, 730680.4031137696], [388986.3764650667, 730697.7931447683], [388991.6601230222, 730704.1938949027], [388989.0328576, 730717.0991958964], [388984.10455039993, 730722.190096695], [388978.33738240006, 730732.5451756706], [388973.0245973334, 730730.9667786714], [388964.5311317334, 730728.8940401464], [388956.6143829333, 730735.901419042], [388946.6703872, 730743.6978672277], [388935.9341340444, 730746.6897942817], [388926.4095687111, 730751.1819836799], [388914.7237717333, 730754.269253901], [388907.27305671107, 730760.5564663331], [388900.32332799997, 730761.2935820448], [388892.72697742225, 730761.6751473515], [388888.4627683556, 730749.6296684695], [388876.38084266667, 730747.5917046277], [388869.2854784, 730752.7256214346], [388862.2192412444, 730759.6025500925], [388855.1355278222, 730750.6443108611], [388850.67325439997, 730748.0166425294], [388840.9273230222, 730746.4903330961], [388831.75810844445, 730754.96301958], [388827.5288519111, 730749.4041920723], [388830.7095324444, 730738.6852608543], [388823.7132003556, 730736.32636797], [388819.47229297773, 730729.4317389231], [388816.2158819555, 730718.9378242854], [388802.01932799997, 730710.0568328432], [388807.2505571556, 730695.1564949607], [388805.4505016889, 730686.9428849767], [388786.31981511106, 730678.9199429008], [388787.71209102223, 730664.7905440133], [388780.8846961778, 730658.1463640912], [388784.46150542225, 730645.785846984], [388780.73906062223, 730632.8177820132], [388777.28458524443, 730625.7741013083], [388781.94492302224, 730611.0704966357], [388773.4689336888, 730600.2094727741], [388774.10390471114, 730579.761930503], [388770.60282595555, 730566.4189098617], [388755.01399608894, 730562.5582092234], [388743.3398499556, 730555.8517898945], [388748.2040775111, 730543.4797892354], [388749.83519573335, 730534.1181407066], [388744.74377671105, 730526.7085052117], [388743.50878720003, 730515.4289665648], [388731.74143431114, 730507.8368103355], [388728.1413233778, 730496.8604953415], [388715.0166471111, 730476.0177759537], [388694.41795413336, 730455.2695480774], [388675.10667946667, 730444.6477515546], [388699.21227662225, 730436.5337104137], [388704.1405838222, 730426.1110751354], [388719.9507797333, 730410.0817888828], [388741.6504775111, 730394.2168332664], [388748.37301475555, 730401.7414743535], [388754.8392334222, 730404.3624847436], [388758.3694392889, 730409.2659896994], [388765.7327729778, 730397.3412669776], [388774.9835434667, 730395.9352744905], [388781.2633486222, 730399.9449451749], [388782.62067200005, 730409.7780340394], [388784.71782400005, 730412.3122110192], [388786.72176924447, 730416.4779504067], [388786.28486257774, 730421.2511460749], [388787.0188657778, 730426.9702357096], [388791.7083306667, 730427.96824846], [388794.12588088884, 730423.7852584864], [388793.07730488887, 730420.3659390642], [388795.2851399111, 730416.0613782024], [388799.4619676444, 730412.0692083656], [388800.6387029333, 730406.0374933253], [388799.67168284446, 730400.1445598819], [388798.44251875556, 730393.5138326925], [388802.5785685333, 730390.588991366], [388807.0117148444, 730389.2610897743], [388813.17501155555, 730386.3535791521], [388819.34995911113, 730383.5762380383], [388824.3947747556, 730381.7275608643], [388828.3327601778, 730379.3320805589], [388829.4687175111, 730374.8708984861], [388834.4494535111, 730370.704774146], [388838.1252949333, 730370.2100443211], [388841.7137550222, 730370.4617490363], [388846.3624419556, 730372.0240510241], [388849.7703139556, 730372.3885873747], [388852.7063267556, 730375.6086456536], [388854.1452060444, 730377.6048966344], [388858.99195733335, 730376.4852613038], [388862.6095445333, 730375.5565694217], [388863.01732408896, 730369.0122751228], [388864.21736106667, 730365.8268879091], [388864.3746474667, 730361.2527366106], [388867.45047040004, 730356.1751138577], [388872.83316053334, 730355.593570503], [388875.9031580445, 730351.2536710037], [388883.4703815111, 730345.5596594117], [388893.64156871114, 730343.6674262024], [388903.4923576889, 730338.7024462137], [388909.95275093336, 730350.8543981484], [388919.51809422224, 730354.0051721393], [388916.90830506664, 730350.5158839275], [388917.3685134222, 730346.1672555441], [388921.8890410667, 730346.7054114338], [388925.1571029334, 730345.1256616721], [388928.10476657783, 730344.2750248885], [388930.46988800005, 730342.4175063277], [388933.6913464889, 730340.4818596728], [388936.4525966222, 730339.0930497707], [388941.91101724445, 730338.1816409432], [388945.60433493333, 730337.9559584734], [388947.44516835554, 730337.9385982786], [388949.33260515553, 730338.0861599126], [388951.40063004446, 730338.2684418634], [388954.3541191111, 730340.0304969237], [388956.63768462226, 730341.1502229106], [388959.8358414222, 730341.7751850409], [388964.0010183111, 730340.117297488], [388965.859328, 730337.7649962944], [388969.2905016889, 730336.1070939729]]};
+    const geoPerimeterMeta = { acres: 4140.24745599043, dateCurrentMs: 1785534195694, source: "2026 NIFS", behaviorGeneral: "Active", behaviorDetail: ["Uphill Runs", "Group Torching", "Short-range Spotting"], cause: "Natural" };
+    const terrainGoes = {"zoom": 7, "viewMinX": 5376, "viewMinY": 10496, "viewW": 1536, "viewH": 1792, "tiles": [{"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/41/21.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/41/21.png"}, "x": 5376, "y": 10496}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/41/22.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/41/22.png"}, "x": 5632, "y": 10496}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/41/23.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/41/23.png"}, "x": 5888, "y": 10496}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/41/24.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/41/24.png"}, "x": 6144, "y": 10496}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/41/25.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/41/25.png"}, "x": 6400, "y": 10496}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/41/26.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/41/26.png"}, "x": 6656, "y": 10496}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/42/21.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/42/21.png"}, "x": 5376, "y": 10752}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/42/22.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/42/22.png"}, "x": 5632, "y": 10752}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/42/23.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/42/23.png"}, "x": 5888, "y": 10752}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/42/24.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/42/24.png"}, "x": 6144, "y": 10752}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/42/25.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/42/25.png"}, "x": 6400, "y": 10752}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/42/26.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/42/26.png"}, "x": 6656, "y": 10752}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/43/21.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/43/21.png"}, "x": 5376, "y": 11008}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/43/22.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/43/22.png"}, "x": 5632, "y": 11008}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/43/23.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/43/23.png"}, "x": 5888, "y": 11008}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/43/24.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/43/24.png"}, "x": 6144, "y": 11008}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/43/25.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/43/25.png"}, "x": 6400, "y": 11008}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/43/26.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/43/26.png"}, "x": 6656, "y": 11008}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/44/21.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/44/21.png"}, "x": 5376, "y": 11264}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/44/22.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/44/22.png"}, "x": 5632, "y": 11264}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/44/23.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/44/23.png"}, "x": 5888, "y": 11264}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/44/24.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/44/24.png"}, "x": 6144, "y": 11264}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/44/25.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/44/25.png"}, "x": 6400, "y": 11264}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/44/26.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/44/26.png"}, "x": 6656, "y": 11264}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/45/21.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/45/21.png"}, "x": 5376, "y": 11520}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/45/22.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/45/22.png"}, "x": 5632, "y": 11520}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/45/23.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/45/23.png"}, "x": 5888, "y": 11520}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/45/24.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/45/24.png"}, "x": 6144, "y": 11520}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/45/25.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/45/25.png"}, "x": 6400, "y": 11520}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/45/26.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/45/26.png"}, "x": 6656, "y": 11520}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/46/21.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/46/21.png"}, "x": 5376, "y": 11776}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/46/22.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/46/22.png"}, "x": 5632, "y": 11776}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/46/23.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/46/23.png"}, "x": 5888, "y": 11776}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/46/24.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/46/24.png"}, "x": 6144, "y": 11776}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/46/25.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/46/25.png"}, "x": 6400, "y": 11776}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/46/26.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/46/26.png"}, "x": 6656, "y": 11776}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/47/21.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/47/21.png"}, "x": 5376, "y": 12032}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/47/22.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/47/22.png"}, "x": 5632, "y": 12032}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/47/23.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/47/23.png"}, "x": 5888, "y": 12032}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/47/24.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/47/24.png"}, "x": 6144, "y": 12032}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/47/25.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/47/25.png"}, "x": 6400, "y": 12032}, {"urls": {"geocolor": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/7/47/26.png", "firetemp": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-West_ABI_FireTemp/default/default/GoogleMapsCompatible_Level7/7/47/26.png"}, "x": 6656, "y": 12032}], "fire": {"tx": 6076.643555555556, "ty": 11415.072099402703}, "perimeterPolygon": [[6077.645164088889, 11411.501673343326], [6077.725263644445, 11411.510895978427], [6077.746016711112, 11411.536393789034], [6077.772231111112, 11411.586439754932], [6077.888011377779, 11411.64855593288], [6078.0231793777775, 11411.655472765931], [6078.121756444444, 11411.681241299728], [6078.190114133333, 11411.738202986919], [6078.2427249777775, 11411.782822653047], [6078.389634844445, 11411.842224687356], [6078.475195733334, 11411.870433696928], [6078.527624533333, 11411.920884143574], [6078.550926222223, 11411.981098719165], [6078.547376355556, 11412.054603200726], [6078.51852231111, 11412.168113225373], [6078.472100977778, 11412.243785557672], [6078.580235377778, 11412.314846289992], [6078.644588088889, 11412.276061322762], [6078.716950755556, 11412.308472551322], [6078.801055288889, 11412.372887729642], [6078.855486577778, 11412.512836147627], [6078.775296000001, 11412.539686397899], [6078.6729870222225, 11412.571689592678], [6078.584331377778, 11412.620643350478], [6078.55129031111, 11412.711634056293], [6078.543735466667, 11412.826082691929], [6078.558116977778, 11412.926969518825], [6078.489850311111, 11413.005074455847], [6078.492580977778, 11413.129823598578], [6078.574592, 11413.31748553397], [6078.559664355556, 11413.484939754933], [6078.569221688888, 11413.574699000403], [6078.542279111111, 11413.659982781606], [6078.550016, 11413.824174877322], [6078.447707022222, 11413.974127316887], [6078.475832888889, 11414.087064069947], [6078.576048355556, 11414.270633268075], [6078.610727822222, 11414.362144927538], [6078.623379911111, 11414.487276722388], [6078.6147328, 11414.62216711857], [6078.584604444444, 11414.747023160922], [6078.558481066666, 11414.840697629694], [6078.539912533333, 11415.00459105993], [6078.50496, 11415.097177638158], [6078.5688576, 11415.284787116145], [6078.7669219555555, 11415.575680362734], [6078.707393422223, 11415.68276291985], [6078.756636444445, 11415.971471063654], [6078.8195328, 11416.226961116474], [6078.816438044445, 11416.543701691055], [6078.917745777779, 11416.67326711239], [6078.727691377779, 11416.813130036877], [6078.509238044444, 11416.761088343104], [6078.341848177777, 11416.659849883421], [6078.265298488889, 11416.598726627863], [6078.158529422222, 11416.711892325682], [6077.951089777778, 11416.814214234755], [6077.832578844444, 11416.88129865265], [6077.912132266667, 11417.153017887005], [6077.994689422222, 11417.253029607855], [6077.9536384, 11417.454674935881], [6077.876633599999, 11417.534220260859], [6077.786521600001, 11417.696018369854], [6077.703509333334, 11417.67135591674], [6077.570798933334, 11417.638969377287], [6077.447099733333, 11417.748459672532], [6077.2917248, 11417.870279175433], [6077.123970844444, 11417.917028035652], [6076.975149511111, 11417.987218494998], [6076.792558933333, 11418.035457092203], [6076.6761415111105, 11418.133694786455], [6076.5675519999995, 11418.14521221945], [6076.448859022223, 11418.151174177367], [6076.3822307555565, 11417.962963569837], [6076.193450666667, 11417.931120384808], [6076.0825856, 11418.011337834916], [6075.972175644444, 11418.118789845195], [6075.861492622222, 11417.978817357205], [6075.7917695999995, 11417.937760039522], [6075.639489422222, 11417.913911454627], [6075.496220444445, 11418.046297180937], [6075.430138311111, 11417.95944050113], [6075.479836444444, 11417.791957200849], [6075.370518755556, 11417.75509949953], [6075.304254577777, 11417.647370920673], [6075.253373155555, 11417.483403504459], [6075.0315519999995, 11417.344638013175], [6075.113289955556, 11417.11182023376], [6075.085164088889, 11416.983482577762], [6074.78624711111, 11416.858124107825], [6074.808001422222, 11416.637352250207], [6074.701323377778, 11416.533536938925], [6074.757211022223, 11416.340403859125], [6074.699047822222, 11416.137777843956], [6074.645071644444, 11416.027720332942], [6074.7178894222225, 11415.797976509934], [6074.585452088888, 11415.628273012095], [6074.595373511112, 11415.308780164109], [6074.540669155555, 11415.10029546659], [6074.29709368889, 11415.039972019116], [6074.114685155556, 11414.935184217102], [6074.190688711111, 11414.741871706803], [6074.216174933334, 11414.59559594854], [6074.13662151111, 11414.479820393934], [6074.1173248000005, 11414.303577602575], [6073.933459911112, 11414.184950161492], [6073.877208177778, 11414.01344523971], [6073.672135111111, 11413.687777749277], [6073.350280533334, 11413.363586688709], [6073.048541866667, 11413.19762111804], [6073.425191822223, 11413.070839225215], [6073.502196622222, 11412.90798554899], [6073.749230933333, 11412.657527951294], [6074.088288711111, 11412.409638019788], [6074.193328355555, 11412.527210536773], [6074.294363022222, 11412.568163824119], [6074.349522488889, 11412.644781089053], [6074.464574577778, 11412.458457296525], [6074.6091178666675, 11412.436488663914], [6074.707239822222, 11412.499139768357], [6074.728448000001, 11412.652781781866], [6074.761216000001, 11412.692378297175], [6074.792527644445, 11412.757467975105], [6074.785700977777, 11412.83204915742], [6074.797169777778, 11412.921409932962], [6074.870442666667, 11412.937003882187], [6074.908216888888, 11412.87164466385], [6074.8918328888885, 11412.818217797878], [6074.926330311111, 11412.750959034413], [6074.991593244444, 11412.688581380713], [6075.009979733333, 11412.594335833208], [6074.994870044445, 11412.502258748154], [6074.975664355556, 11412.39865363582], [6075.040290133333, 11412.352952990093], [6075.1095580444435, 11412.332204527724], [6075.205859555555, 11412.286774674252], [6075.302343111111, 11412.243378719348], [6075.381168355556, 11412.214493138505], [6075.442699377778, 11412.177063758732], [6075.460448711111, 11412.107357788846], [6075.538272711111, 11412.04226209603], [6075.595707733333, 11412.034531942518], [6075.651777422222, 11412.038464828693], [6075.724413155556, 11412.062875797252], [6075.777661155556, 11412.06857167773], [6075.823536355556, 11412.118885088337], [6075.846018844444, 11412.150076509912], [6075.9217493333335, 11412.132582207872], [6075.978274133333, 11412.118071397213], [6075.98464568889, 11412.015816798794], [6076.003396266667, 11411.96604512358], [6076.005853866667, 11411.89457400954], [6076.053913600001, 11411.815236154027], [6076.138018133333, 11411.80614953911], [6076.185986844445, 11411.738338609433], [6076.304224711111, 11411.649369678307], [6076.463149511112, 11411.619803534413], [6076.617068088889, 11411.542225722089], [6076.718011733334, 11411.732099971068], [6076.867470222222, 11411.781330814676], [6076.826692266666, 11411.726810686367], [6076.833883022222, 11411.658863367877], [6076.904516266667, 11411.667272053654], [6076.955579733334, 11411.642588463626], [6077.001636977779, 11411.629297263882], [6077.038592000001, 11411.60027353637], [6077.088927288889, 11411.570029057388], [6077.132071822222, 11411.548328902667], [6077.2173596444445, 11411.534088139737], [6077.275067733333, 11411.530561851147], [6077.303830755555, 11411.530290598103], [6077.333321955555, 11411.532596248635], [6077.365634844445, 11411.535444404115], [6077.411783111111, 11411.562976514433], [6077.447463822223, 11411.580472232978], [6077.497435022222, 11411.590237266264], [6077.5625159111105, 11411.56433277325], [6077.591552, 11411.5275780671], [6077.645164088889, 11411.501673343326]], "home": {"minX": 5876.394666666667, "minY": 11187.737248112908, "w": 400.49777777777854, "h": 447.5549372943824}};
+    function makeZoomPannable(svgId) {
+      const svg = document.getElementById(svgId);
+      if (!svg) return;
+      const wrap = svg.closest(".zoomable-map-wrap");
+      const vb = svg.viewBox.baseVal;
+      const home = { x: vb.x, y: vb.y, w: vb.width, h: vb.height };
+      if (!home.w || !home.h) return;
+      let view = { x: home.x, y: home.y, w: home.w, h: home.h };
+      // Pan/zoom-out bounds are the full FETCHED tile area, not just the
+      // initial "home" framing -- for layers that fetch more than they show
+      // by default (e.g. GOES: wide fetch, narrower home view), this is what
+      // gives real zoom-out room instead of hitting the edge immediately.
+      // Falls back to home's own extent for layers with no separate fetch area.
+      const fetchW = svg.dataset.fetchW ? parseFloat(svg.dataset.fetchW) : home.w;
+      const fetchH = svg.dataset.fetchH ? parseFloat(svg.dataset.fetchH) : home.h;
+      const fetchX = svg.dataset.fetchX ? parseFloat(svg.dataset.fetchX) : home.x;
+      const fetchY = svg.dataset.fetchY ? parseFloat(svg.dataset.fetchY) : home.y;
+      const minW = home.w * 0.12;
+      const maxW = fetchW;
+
+      function apply() { svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`); }
+
+      function clampPan() {
+        const slack = 0.05;
+        const minX = fetchX - fetchW * slack, maxX = fetchX + fetchW * (1 + slack) - view.w;
+        const minY = fetchY - fetchH * slack, maxY = fetchY + fetchH * (1 + slack) - view.h;
+        view.x = Math.min(Math.max(view.x, minX), Math.max(minX, maxX));
+        view.y = Math.min(Math.max(view.y, minY), Math.max(minY, maxY));
+      }
+
+      function zoomAt(factor, cx, cy) {
+        const newW = Math.min(Math.max(view.w / factor, minW), maxW);
+        const newH = newW * (home.h / home.w);
+        const fx = (cx - view.x) / view.w, fy = (cy - view.y) / view.h;
+        view.x = cx - fx * newW;
+        view.y = cy - fy * newH;
+        view.w = newW; view.h = newH;
+        clampPan();
+        apply();
+      }
+
+      function clientToUser(clientX, clientY) {
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return { x: view.x + view.w / 2, y: view.y + view.h / 2 };
+        const pt = svg.createSVGPoint();
+        pt.x = clientX; pt.y = clientY;
+        const p = pt.matrixTransform(ctm.inverse());
+        return { x: p.x, y: p.y };
+      }
+
+      // Listeners go on `wrap`, not `svg` -- the zoom buttons, basemap
+      // switcher, and hint text are overlay <div>s positioned on top of the
+      // svg but are DOM siblings, not descendants, so a listener on `svg`
+      // alone never sees wheel/drag events that start over those overlays.
+      const target = wrap || svg;
+
+      target.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const p = clientToUser(e.clientX, e.clientY);
+        zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, p.x, p.y);
+      }, { passive: false });
+
+      let dragging = false, last = null;
+      target.addEventListener("mousedown", (e) => {
+        if (e.target.closest(".zoom-btn, .basemap-btn")) return;
+        dragging = true; last = { x: e.clientX, y: e.clientY };
+        svg.classList.add("grabbing");
+      });
+      window.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        const rect = svg.getBoundingClientRect();
+        if (!rect.width) return;
+        const scale = view.w / rect.width;
+        view.x -= (e.clientX - last.x) * scale;
+        view.y -= (e.clientY - last.y) * scale;
+        last = { x: e.clientX, y: e.clientY };
+        clampPan();
+        apply();
+      });
+      window.addEventListener("mouseup", () => { dragging = false; svg.classList.remove("grabbing"); });
+      target.addEventListener("dblclick", (e) => {
+        if (e.target.closest(".zoom-btn, .basemap-btn")) return;
+        view = { x: home.x, y: home.y, w: home.w, h: home.h }; apply();
+      });
+
+      if (wrap) {
+        wrap.querySelectorAll(".zoom-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const action = btn.getAttribute("data-zoom");
+            const cx = view.x + view.w / 2, cy = view.y + view.h / 2;
+            if (action === "in") zoomAt(1.4, cx, cy);
+            else if (action === "out") zoomAt(1 / 1.4, cx, cy);
+            else { view = { x: home.x, y: home.y, w: home.w, h: home.h }; apply(); }
+          });
+        });
+      }
+    }
+
+    const DEFAULT_BASEMAP = "topo";
+
+    function renderTerrainLayer(svgId, layer, afterTiles) {
+      const svg = document.getElementById(svgId);
+      if (!svg || !layer) return null;
+      if (layer.home) {
+        // Initial view is the narrower "home" framing; the full fetched
+        // tile area (local coords, origin at viewMinX/viewMinY) is stashed
+        // for makeZoomPannable to use as the zoom-out/pan limit.
+        const hx = layer.home.minX - layer.viewMinX, hy = layer.home.minY - layer.viewMinY;
+        svg.setAttribute("viewBox", `${hx} ${hy} ${layer.home.w} ${layer.home.h}`);
+        svg.dataset.fetchX = 0; svg.dataset.fetchY = 0;
+        svg.dataset.fetchW = layer.viewW; svg.dataset.fetchH = layer.viewH;
+      } else {
+        svg.setAttribute("viewBox", `0 0 ${layer.viewW} ${layer.viewH}`);
+      }
+      // Different layers carry different style sets (topo/imagery/hillshade
+      // for the ESRI-tiled maps vs geocolor/firetemp for GOES) -- fall back
+      // to whatever key the tile actually has rather than assuming "topo"
+      // exists on every layer.
+      const firstStyle = layer.tiles[0] ? Object.keys(layer.tiles[0].urls)[0] : null;
+      const initialStyle = (layer.tiles[0] && layer.tiles[0].urls[DEFAULT_BASEMAP]) ? DEFAULT_BASEMAP : firstStyle;
+      layer.tiles.forEach(t => {
+        const img = el("image", {
+          href: t.urls[initialStyle], x: t.x - layer.viewMinX, y: t.y - layer.viewMinY,
+          width: 256, height: 256, preserveAspectRatio: "none",
+        });
+        img.dataset.urls = JSON.stringify(t.urls);
+        img.classList.add("basemap-tile");
+        svg.appendChild(img);
+      });
+      if (afterTiles) afterTiles(svg, layer);
+      setupBasemapSwitcher(svgId, initialStyle);
+      return svg;
+    }
+
+    function setupBasemapSwitcher(svgId, initialStyle) {
+      const svg = document.getElementById(svgId);
+      const wrap = svg && svg.closest(".zoomable-map-wrap");
+      if (!wrap) return;
+      const switcher = wrap.querySelector(".basemap-switcher");
+      if (!switcher) return;
+      const buttons = switcher.querySelectorAll(".basemap-btn");
+      buttons.forEach(b => b.classList.toggle("active", b.getAttribute("data-basemap") === initialStyle));
+      buttons.forEach(btn => {
+        btn.addEventListener("click", () => {
+          const style = btn.getAttribute("data-basemap");
+          svg.querySelectorAll("image.basemap-tile").forEach(img => {
+            const urls = JSON.parse(img.dataset.urls);
+            img.setAttribute("href", urls[style]);
+          });
+          buttons.forEach(b => b.classList.toggle("active", b === btn));
+        });
+      });
+    }
+
+    // ---- full network map, real terrain, every station ----
+    const gTip = document.getElementById("geoTooltip");
+    let gPinned = null;
+    renderTerrainLayer("geoMap", terrainNetwork, (gsvg, layer) => {
+      function attachGeoHover(node, s) {
+        function show() {
+          const windText = s.sknt == null ? "no wind data" : `${s.sknt} mph sustained${s.gust == null ? "" : ", " + s.gust + " mph gust"}`;
+          const dirText = s.dir == null ? "—" : s.dir + "°";
+          gTip.innerHTML = `<div class="t-title">${s.id}</div><div style="color:var(--text-secondary); margin-bottom:4px;">${s.name}</div><div class="t-row"><span>Elevation</span><span>${s.elev != null ? s.elev.toLocaleString() + " ft" : "unknown"}</span></div><div class="t-row"><span>Sector</span><span>${s.sector}</span></div><div class="t-row"><span>Wind speed</span><span>${windText}</span></div><div class="t-row"><span>Wind direction</span><span>${dirText}</span></div>`;
+          const pt = node.getBBox ? node.getBBox() : { x: 0, y: 0 };
+          gTip.style.opacity = "1";
+          gTip.style.left = ((pt.x / layer.viewW) * 100) + "%";
+          gTip.style.top = ((pt.y / layer.viewH) * 100) + "%";
+        }
+        node.addEventListener("mouseenter", () => { if (!gPinned) show(); });
+        node.addEventListener("mouseleave", () => { if (!gPinned) gTip.style.opacity = "0"; });
+        node.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (gPinned === node) { gPinned = null; gTip.style.opacity = "0"; }
+          else { gPinned = node; show(); }
+        });
+      }
+      layer.stations.forEach(s => {
+        const x = s.tx - layer.viewMinX, y = s.ty - layer.viewMinY;
+        const color = s.severity ? severityColor(s.severity) : sectorColor(s.sector);
+        const attrs = { cx: x, cy: y, r: 4.5, class: "geo-station-dot", stroke: color, fill: s.reporting ? color : "none" };
+        if (!s.reporting) attrs.stroke = "var(--text-muted)";
+        const dot = el("circle", attrs);
+        attachGeoHover(dot, s);
+        gsvg.appendChild(dot);
+        if (s.reporting) drawWindArrow(gsvg, el, x, y, s.dir, s.sknt, s.severity);
+      });
+      layer.special.forEach(s => {
+        const x = s.tx - layer.viewMinX, y = s.ty - layer.viewMinY;
+        if (s.id === "SPBM8") {
+          const ghost = el("circle", { cx: x, cy: y, r: 6, fill: "none", stroke: "var(--warning)", "stroke-width": 1.6, "stroke-dasharray": "2.5 2.5", class: "station-dot" });
+          attachGeoHover(ghost, s);
+          gsvg.appendChild(ghost);
+        } else {
+          const rect = el("rect", { x: x - 6, y: y - 6, width: 12, height: 12, transform: `rotate(45 ${x} ${y})`, fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 1.2, class: "station-dot" });
+          attachGeoHover(rect, s);
+          gsvg.appendChild(rect);
+        }
+      });
+      const fx = layer.fire.tx - layer.viewMinX, fy = layer.fire.ty - layer.viewMinY;
+      if (layer.perimeterPolygon && layer.perimeterPolygon.length > 2) {
+        const pts = layer.perimeterPolygon.map(([x, y]) => `${x - layer.viewMinX},${y - layer.viewMinY}`).join(" ");
+        gsvg.appendChild(el("polygon", { points: pts, class: "fire-perimeter", style: "stroke-width:1;" }));
+      } else {
+        gsvg.appendChild(el("path", {
+          d: `M${fx},${fy-10} C${fx+6},${fy-4} ${fx+5},${fy+2} ${fx},${fy+9} C${fx-5},${fy+2} ${fx-6},${fy-4} ${fx},${fy-10} Z`,
+          class: "fire-marker",
+        }));
+      }
+      const fLbl = el("text", { x: fx, y: fy - 14, class: "geo-label", "text-anchor": "middle", "font-weight": "700" });
+      fLbl.textContent = "SILVERTIP";
+      gsvg.appendChild(fLbl);
+      gsvg.addEventListener("click", () => { if (gPinned) { gPinned = null; gTip.style.opacity = "0"; } });
+    });
+    if (!terrainNetwork) {
+      const container = document.getElementById("geoMap");
+      if (container) container.insertAdjacentHTML("afterend", '<div class="no-data-note">Terrain layer unavailable this run.</div>');
+    } else {
+      makeZoomPannable("geoMap");
+    }
+
+    // ---- perimeter close-up, real terrain, real polygon ----
+    const psvg = document.getElementById("geoPerimeterMap");
+    const factsEl = document.getElementById("geoFacts");
+    renderTerrainLayer("geoPerimeterMap", terrainPerimeter, (svg, layer) => {
+      const pts = layer.polygon.map(([x, y]) => `${x - layer.viewMinX},${y - layer.viewMinY}`).join(" ");
+      svg.appendChild(el("polygon", { points: pts, class: "fire-perimeter" }));
+      const metersPerPx = 156543.03392 * Math.cos(FIRE.lat * Math.PI / 180) / Math.pow(2, layer.zoom);
+      const barMi = 0.5;
+      const barPx = barMi * 1609.34 / metersPerPx;
+      const barY = layer.viewH - 14;
+      svg.appendChild(el("line", { x1: 12, x2: 12, y1: barY - 5, y2: barY + 5, stroke: "#fff", "stroke-width": 3 }));
+      svg.appendChild(el("line", { x1: 12 + barPx, x2: 12 + barPx, y1: barY - 5, y2: barY + 5, stroke: "#fff", "stroke-width": 3 }));
+      svg.appendChild(el("line", { x1: 12, x2: 12 + barPx, y1: barY, y2: barY, stroke: "#fff", "stroke-width": 4 }));
+      svg.appendChild(el("line", { x1: 12, x2: 12 + barPx, y1: barY, y2: barY, stroke: "var(--critical)", "stroke-width": 2 }));
+      const barLbl = el("text", { x: 12, y: barY - 9, class: "geo-label", fill: "#fff" });
+      barLbl.textContent = barMi + " mi";
+      svg.appendChild(barLbl);
+    });
+    if (!terrainPerimeter && psvg) {
+      psvg.parentElement.insertAdjacentHTML("afterbegin", '<div class="no-data-note">No cached perimeter fetch yet — real shape only, never approximated with a circle.</div>');
+    } else {
+      makeZoomPannable("geoPerimeterMap");
+    }
+
+    if (factsEl) {
+      if (geoPerimeterMeta) {
+        const dateStr = geoPerimeterMeta.dateCurrentMs ? new Date(geoPerimeterMeta.dateCurrentMs).toISOString().slice(0, 16).replace("T", " ") + "Z" : "unknown";
+        factsEl.innerHTML = `
+          <dt>Perimeter acres (GIS-measured)</dt><dd>${geoPerimeterMeta.acres != null ? geoPerimeterMeta.acres.toLocaleString(undefined, {maximumFractionDigits: 1}) : "—"}</dd>
+          <dt>Perimeter current as of</dt><dd>${dateStr}</dd>
+          <dt>Source</dt><dd>${geoPerimeterMeta.source || "—"}</dd>
+          <dt>Fire behavior</dt><dd>${geoPerimeterMeta.behaviorGeneral || "—"}${geoPerimeterMeta.behaviorDetail && geoPerimeterMeta.behaviorDetail.length ? " — " + geoPerimeterMeta.behaviorDetail.join(", ") : ""}</dd>
+          <dt>Cause</dt><dd>${geoPerimeterMeta.cause || "—"}</dd>
+        `;
+      } else {
+        factsEl.innerHTML = `<div class="no-data-note">No cached perimeter fetch yet — run fetch_perimeter.py. Never approximated with a circle in place of real geometry.</div>`;
+      }
+    }
+
+    // ---- GOES satellite, real georeferenced tiles, target fire overlaid ----
+    const goesWrap = document.getElementById("goesMapWrap");
+    renderTerrainLayer("goesMap", terrainGoes, (svg, layer) => {
+      if (layer.perimeterPolygon && layer.perimeterPolygon.length > 2) {
+        const pts = layer.perimeterPolygon.map(([x, y]) => `${x - layer.viewMinX},${y - layer.viewMinY}`).join(" ");
+        svg.appendChild(el("polygon", { points: pts, class: "fire-perimeter", style: "stroke-width:2;" }));
+      }
+      // Perimeter is only ~2-3px across at this zoom -- a small halo ring
+      // around the fire point makes it findable at a glance regardless.
+      const fx = layer.fire.tx - layer.viewMinX, fy = layer.fire.ty - layer.viewMinY;
+      svg.appendChild(el("circle", { cx: fx, cy: fy, r: 14, fill: "none", stroke: "var(--critical)", "stroke-width": 2, "stroke-dasharray": "3 3" }));
+      const fLbl = el("text", { x: fx, y: fy - 22, class: "sat-label", "text-anchor": "middle" });
+      fLbl.textContent = "SILVERTIP";
+      svg.appendChild(fLbl);
+    });
+    if (!terrainGoes && goesWrap) {
+      goesWrap.insertAdjacentHTML("afterend", '<div class="no-data-note">GOES layer unavailable this run.</div>');
+    } else {
+      makeZoomPannable("goesMap");
+    }
+  })();
+
+  // ---- current wind table ----
+  const windTbody = document.getElementById("windTable");
+  const TREND_GLYPH = { up: "▲", down: "▼", flat: "—" };
+  stations
+    .filter(s => s.reporting && s.sknt != null)
+    .sort((a, b) => b.sknt - a.sknt)
+    .forEach(s => {
+      const tr = document.createElement("tr");
+      const gust = s.gust == null ? "—" : s.gust;
+      const dir = s.dir == null ? "—" : s.dir + "°";
+      const age = s.age_min == null ? "—" : s.age_min;
+      const sevClass = s.severity ? `sev-${s.severity}` : "";
+      const trendHtml = s.trend ? `<span class="trend-${s.trend}">${TREND_GLYPH[s.trend]}</span>` : "—";
+      tr.innerHTML = `<td>${s.id}${s.stale ? ' <span class="pill pill-wait">STALE</span>' : ""}</td><td>${s.sector}</td><td class="num">${s.dist}</td><td class="num ${sevClass}">${s.sknt}</td><td class="num">${trendHtml}</td><td class="num">${gust}</td><td class="num">${dir}</td><td class="num">${age}</td>`;
+      windTbody.appendChild(tr);
+    });
+})();
+
+// ---- multi-station wind history chart ----
+(function() {
+  const stationHistoryCycles = ["5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"];
+  const stationSeries = [
+    { id: "MTBWG", name: "Browning (US-89)", color: "var(--series-3)", values: [13.0, 11.0, 4.9, 9.0, 10.0, 3.0, 7.9, 2.0, 0.0, 6.0, 7.9, 18.0, 25.0, 26.0, 29.0, 32.0, 36.0] },
+    { id: "MTCTS", name: "Choteau South (US-287)", color: "var(--series-4)", values: [7.0, 4.9, 0.0, 1.0, 4.0, 3.0, 4.0, 4.0, 7.0, 18.0, 10.0, 11.0, 12.0, 23.9, 25.0, 27.0, 28.0] },
+    { id: "MTPND", name: "Pendroy (US-89)", color: "var(--series-5)", values: [3.0, 4.0, 0.0, 3.0, 1.0, 3.0, 4.0, 3.0, 7.9, 10.0, 11.0, 9.0, 25.0, 20.0, 26.0, 20.0, 27.0] },
+    { id: "CTB", name: "Cut Bank (AWOS)", color: "var(--series-6)", values: [3.5, 4.6, 4.6, 0.0, 0.0, 0.0, 0.0, 0.0, 5.8, 5.8, 12.7, 11.5, 6.9, 19.6, 36.8, 27.6, 26.5] },
+    { id: "MTBRN", name: "Two Medicine Bridge (US-2)", color: "var(--series-7)", values: [4.9, 4.0, 6.0, 7.0, 6.0, 4.9, 7.0, 4.9, 6.0, 6.0, 19.0, 18.0, 23.0, 20.0, 23.9, 20.0, 26.0] },
+  ];
+  if (stationSeries.length === 0) return;
+
+  const legendEl = document.getElementById("multiWindLegend");
+  stationSeries.forEach(s => {
+    const item = document.createElement("span");
+    item.className = "item";
+    item.innerHTML = `<span class="swatch" style="background:${s.color}"></span>${s.id}`;
+    legendEl.appendChild(item);
+  });
+
+  const svg = document.getElementById("multiWindChart");
+  const tooltip = document.getElementById("multiWindTooltip");
+  const W = 900, H = 280, padL = 34, padR = 60, padT = 16, padB = 30;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const allVals = stationSeries.flatMap(s => s.values.filter(v => v != null));
+  const maxY = Math.max(24, Math.ceil((Math.max(...allVals, 0) + 4) / 6) * 6);
+  const n = stationHistoryCycles.length;
+  const xFor = i => padL + (plotW * i / (n - 1));
+  const yFor = v => padT + plotH - (plotH * v / maxY);
+
+  const ns = "http://www.w3.org/2000/svg";
+  function el(tag, attrs) {
+    const e = document.createElementNS(ns, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const yTicks = [];
+  for (let v = 0; v <= maxY; v += 6) yTicks.push(v);
+  yTicks.forEach(v => {
+    const y = yFor(v);
+    svg.appendChild(el("line", { x1: padL, x2: W - padR, y1: y, y2: y, class: "gridline" }));
+    const t = el("text", { x: padL - 8, y: y + 3, class: "axis-label", "text-anchor": "end" });
+    t.textContent = v;
+    svg.appendChild(t);
+  });
+
+  stationHistoryCycles.forEach((c, i) => {
+    const t = el("text", { x: xFor(i), y: H - 8, class: "axis-label", "text-anchor": "middle" });
+    t.textContent = "c" + c;
+    svg.appendChild(t);
+  });
+
+  stationSeries.forEach(s => {
+    let d = "";
+    s.values.forEach((v, i) => {
+      if (v == null) return;
+      d += (d === "" ? "M" : "L") + xFor(i).toFixed(1) + "," + yFor(v).toFixed(1) + " ";
+    });
+    svg.appendChild(el("path", { d: d.trim(), fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    s.values.forEach((v, i) => {
+      if (v == null) return;
+      svg.appendChild(el("circle", { cx: xFor(i), cy: yFor(v), r: 3, fill: s.color, stroke: "var(--surface-1)", "stroke-width": 1.2 }));
+    });
+    let lastIdx = -1;
+    for (let i = s.values.length - 1; i >= 0; i--) { if (s.values[i] != null) { lastIdx = i; break; } }
+    if (lastIdx >= 0) {
+      const lbl = el("text", { x: xFor(lastIdx) + 8, y: yFor(s.values[lastIdx]) + 4, class: "direct-label", fill: s.color });
+      lbl.textContent = s.id + " " + s.values[lastIdx] + " mph";
+      svg.appendChild(lbl);
+    }
+  });
+
+  const crosshair = el("line", { x1: 0, x2: 0, y1: padT, y2: H - padB, class: "crosshair-line" });
+  svg.appendChild(crosshair);
+
+  stationHistoryCycles.forEach((c, i) => {
+    const hit = el("rect", {
+      x: xFor(i) - (plotW / (n - 1)) / 2, y: padT, width: plotW / (n - 1), height: plotH,
+      class: "hover-target"
+    });
+    hit.addEventListener("mouseenter", () => {
+      crosshair.setAttribute("x1", xFor(i));
+      crosshair.setAttribute("x2", xFor(i));
+      crosshair.setAttribute("opacity", "1");
+      tooltip.style.opacity = "1";
+      let rows = "";
+      stationSeries.forEach(s => {
+        const v = s.values[i];
+        rows += `<div class="t-row"><span><span class="t-dot" style="background:${s.color}"></span>${s.id}</span><span>${v == null ? "—" : v + " mph"}</span></div>`;
+      });
+      tooltip.innerHTML = `<div class="t-title">Cycle ${c}</div>${rows}`;
+      const pct = xFor(i) / W * 100;
+      tooltip.style.left = pct + "%";
+      tooltip.style.top = "-10px";
+    });
+    hit.addEventListener("mouseleave", () => {
+      crosshair.setAttribute("opacity", "0");
+      tooltip.style.opacity = "0";
+    });
+    svg.appendChild(hit);
+  });
+})();
+
+// ---- live satellite panel (real NOAA STAR GOES-18 imagery, cache-busted) ----
+(function() {
+  const PRODUCTS = [
+    {
+      img: document.getElementById("satFireTemp"), timeEl: document.getElementById("satFireTempTime"),
+      url: "https://cdn.star.nesdis.noaa.gov/WFO/mso/FireTemperature/600x600.jpg",
+    },
+    {
+      img: document.getElementById("satGeoColor"), timeEl: document.getElementById("satGeoColorTime"),
+      url: "https://cdn.star.nesdis.noaa.gov/WFO/mso/GEOCOLOR/600x600.jpg",
+    },
+  ];
+  // NOAA doesn't version "latest.jpg" filenames, so the browser has no way to
+  // know a new image landed -- append a fresh cache-busting query param on
+  // every check instead of trusting normal image caching.
+  function refresh(p) {
+    if (!p.img) return;
+    const testImg = new Image();
+    testImg.onload = () => {
+      p.img.src = testImg.src;
+      p.timeEl.textContent = "loaded " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      p.timeEl.style.color = "";
+    };
+    testImg.onerror = () => {
+      p.timeEl.textContent = "unreachable — NOAA source may be down";
+      p.timeEl.style.color = "var(--warning)";
+    };
+    testImg.src = p.url + "?_=" + Date.now();
+  }
+  PRODUCTS.forEach(refresh);
+  setInterval(() => PRODUCTS.forEach(refresh), 5 * 60 * 1000);
+})();
+</script>
+
+</body>
+</html>
